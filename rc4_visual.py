@@ -37,10 +37,20 @@ class RC4Visualizer:
         size_frame = ttk.Frame(control_frame)
         size_frame.grid(row=0, column=1, padx=5, sticky=tk.W)
         
-        ttk.Radiobutton(size_frame, text="64", variable=self.size_var, value=64).pack(side=tk.LEFT)
-        ttk.Radiobutton(size_frame, text="128", variable=self.size_var, value=128).pack(side=tk.LEFT)
-        ttk.Radiobutton(size_frame, text="256", variable=self.size_var, value=256).pack(side=tk.LEFT)
-        ttk.Radiobutton(size_frame, text="512", variable=self.size_var, value=512).pack(side=tk.LEFT)
+        # Keep references so we can disable when RC4+ is selected (RC4+ requires N=256)
+        self.size_radios = []
+        r = ttk.Radiobutton(size_frame, text="64", variable=self.size_var, value=64)
+        r.pack(side=tk.LEFT)
+        self.size_radios.append(r)
+        r = ttk.Radiobutton(size_frame, text="128", variable=self.size_var, value=128)
+        r.pack(side=tk.LEFT)
+        self.size_radios.append(r)
+        r = ttk.Radiobutton(size_frame, text="256", variable=self.size_var, value=256)
+        r.pack(side=tk.LEFT)
+        self.size_radios.append(r)
+        r = ttk.Radiobutton(size_frame, text="512", variable=self.size_var, value=512)
+        r.pack(side=tk.LEFT)
+        self.size_radios.append(r)
         
         # Clave
         ttk.Label(control_frame, text="Clave:").grid(row=1, column=0, padx=5, sticky=tk.W)
@@ -72,6 +82,16 @@ class RC4Visualizer:
         ttk.Button(button_frame, text="Ejecutar Automático", command=self.auto_run).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Detener", command=self.stop).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Reset", command=self.reset).pack(side=tk.LEFT, padx=5)
+        # Algorithm selector (RC4 or RC4+)
+        ttk.Label(control_frame, text="Algoritmo:").grid(row=1, column=2, padx=5, sticky=tk.W)
+        self.algorithm_var = tk.StringVar(value="RC4+")
+        self.algorithm_combo = ttk.Combobox(control_frame, width=8, state='readonly',
+                            values=("RC4", "RC4+"), textvariable=self.algorithm_var)
+        self.algorithm_combo.grid(row=1, column=3, padx=5, sticky=tk.W)
+        self.algorithm_combo.bind('<<ComboboxSelected>>', lambda e: self.on_algorithm_change())
+        
+        # Hidden test button for RC4+
+        ttk.Button(button_frame, text="Run RC4+ Test", command=self._run_rc4plus_test).pack(side=tk.LEFT, padx=5)
         
         # Frame principal - dividido en dos columnas
         main_frame = ttk.Frame(self.root)
@@ -144,6 +164,9 @@ class RC4Visualizer:
         self.keystream = []
         self.ciphertext = []
         self.plaintext_bytes = b""
+        # highlights for RC4+
+        self.last_tprime = None
+        self.last_tdouble = None
         
     def update_speed(self, value):
         self.animation_speed = int(float(value))
@@ -157,7 +180,20 @@ class RC4Visualizer:
     def init_ksa(self):
         """Key Scheduling Algorithm - Inicialización"""
         self.stop()
-        self.N = self.size_var.get()
+        # If RC4+ selected, enforce N == 256
+        if self.algorithm_var.get() == "RC4+":
+            if self.size_var.get() != 256:
+                self.log("WARNING: RC4+ requiere N=256 - forzando N=256", "red")
+            self.size_var.set(256)
+            self.N = 256
+            # disable size radio buttons
+            for rb in getattr(self, 'size_radios', []):
+                rb.configure(state='disabled')
+        else:
+            # enable radios
+            for rb in getattr(self, 'size_radios', []):
+                rb.configure(state='normal')
+            self.N = self.size_var.get()
         self.key = self.key_entry.get()
         # Read plaintext as latin-1 bytes to preserve raw byte values
         self.plaintext = self.text_entry.get()
@@ -214,6 +250,8 @@ class RC4Visualizer:
         self.prga_step = 0
         self.keystream = []
         self.ciphertext = []
+        self.last_tprime = None
+        self.last_tdouble = None
         
         self.var_i_label.config(text=f"i = 0")
         self.var_j_label.config(text=f"j = 0")
@@ -241,32 +279,84 @@ class RC4Visualizer:
             self.display_results()
             return
             
-        # RC4 PRGA (classic)
-        self.i = (self.i + 1) % self.N
-        self.j = (self.j + self.S[self.i]) % self.N
-        
         self.log(f"\n--- Paso {self.prga_step + 1} ---")
-        self.log(f"i = (i + 1) mod {self.N} = {self.i}")
-        self.log(f"j = (j + S[i]) mod {self.N} = (j + S[{self.i}]) mod {self.N} = {self.j}")
+        algo = self.algorithm_var.get() if hasattr(self, 'algorithm_var') else 'RC4'
+        if algo == 'RC4':
+            # RC4 classic
+            self.i = (self.i + 1) % self.N
+            self.j = (self.j + self.S[self.i]) % self.N
+
+            self.log(f"i = (i + 1) mod {self.N} = {self.i}")
+            self.log(f"j = (j + S[i]) mod {self.N} = (j + S[{self.i}]) mod {self.N} = {self.j}")
+
+            # Swap
+            self.S[self.i], self.S[self.j] = self.S[self.j], self.S[self.i]
+            self.log(f"Swap: S[{self.i}] ↔ S[{self.j}]")
+
+            # Output byte (classic RC4)
+            t = (self.S[self.i] + self.S[self.j]) % self.N
+            output_byte = self.S[t]
+
+            self.log(f"t = (S[i] + S[j]) mod {self.N} = {t}")
+            self.log(f"Output = S[t] = S[{t}] = {output_byte}")
+            # clear extra highlights
+            self.last_tprime = None
+            self.last_tdouble = None
+        else:
+            # RC4+ PRGA (Algorithm 1 from Polak & Boryczka 2019)
+            # Ensure N == 256
+            if self.N != 256:
+                self.log("WARNING: RC4+ requiere N=256 - forzando N=256", "red")
+                self.N = 256
+
+            # operate in 8-bit space
+            self.i = (self.i + 1) & 0xFF
+            self.j = (self.j + self.S[self.i]) & 0xFF
+
+            self.log(f"i (after) = (i + 1) mod 256 = {self.i}")
+            self.log(f"j (after) = (j + S[i]) mod 256 = (j + S[{self.i}]) mod 256 = {self.j}")
+
+            # Swap
+            self.S[self.i], self.S[self.j] = self.S[self.j], self.S[self.i]
+            self.log(f"Swap: S[{self.i}] ↔ S[{self.j}]")
+
+            # t
+            t = (self.S[self.i] + self.S[self.j]) & 0xFF
+
+            # idx1 = ((i >> 3) ^ ((j << 5) & 0xFF)) & 0xFF
+            idx1 = (((self.i >> 3) ^ ((self.j << 5) & 0xFF)) & 0xFF)
+            # idx2 = (((i << 5) & 0xFF) ^ (j >> 3)) & 0xFF
+            idx2 = ((((self.i << 5) & 0xFF) ^ (self.j >> 3)) & 0xFF)
+
+            t_prime = ((self.S[idx1] + self.S[idx2]) & 0xFF) ^ 0xAA
+            t_prime &= 0xFF
+
+            t_double = (self.j + self.S[self.j]) & 0xFF
+
+            output_byte = (((self.S[t] + self.S[t_prime]) & 0xFF) ^ self.S[t_double]) & 0xFF
+
+            # Logging specifics
+            self.log(f"t = (S[i] + S[j]) mod 256 = {t}")
+            self.log(f"idx1 = ((i>>3) XOR (j<<5)) & 0xFF = {idx1}")
+            self.log(f"idx2 = ((i<<5) XOR (j>>3)) & 0xFF = {idx2}")
+            self.log(f"t_prime = (S[idx1] + S[idx2]) mod 256 XOR 0xAA = {t_prime}")
+            self.log(f"t_double = (j + S[j]) mod 256 = {t_double}")
+            self.log(f"Output = ((S[t] + S[t_prime]) mod 256) XOR S[t_double] = {output_byte}")
+
+            # store extra highlights
+            self.last_tprime = t_prime
+            self.last_tdouble = t_double
         
-        # Swap
-        self.S[self.i], self.S[self.j] = self.S[self.j], self.S[self.i]
-        self.log(f"Swap: S[{self.i}] ↔ S[{self.j}]")
-        
-        # Output byte (classic RC4)
-        t = (self.S[self.i] + self.S[self.j]) % self.N
-        output_byte = self.S[t]
-        
-        self.log(f"t = (S[i] + S[j]) mod {self.N} = {t}")
-        self.log(f"Output = S[t] = S[{t}] = {output_byte}")
-        
-        # XOR con el texto plano
-        # Operamos sobre bytes (0..255) para que espacios y bytes no imprimibles
-        # se manejen de forma reversible
+        # XOR con el texto plano (bytes)
         plain_byte = self.plaintext_bytes[self.prga_step]
         cipher_byte = plain_byte ^ output_byte
-        
-        self.log(f"Plaintext[{self.prga_step}] = '{self.plaintext[self.prga_step]}' = {plain_byte}")
+
+        # For logging, show printable char if possible
+        try:
+            printable_char = self.plaintext[self.prga_step]
+        except Exception:
+            printable_char = chr(plain_byte)
+        self.log(f"Plaintext[{self.prga_step}] = '{printable_char}' = {plain_byte}")
         self.log(f"Ciphertext[{self.prga_step}] = {plain_byte} ⊕ {output_byte} = {cipher_byte} (0x{cipher_byte:02x})")
         
         self.keystream.append(output_byte)
@@ -276,8 +366,13 @@ class RC4Visualizer:
         self.var_i_label.config(text=f"i = {self.i}")
         self.var_j_label.config(text=f"j = {self.j}")
         self.output_label.config(text=f"Output = {output_byte}")
-        
-        self.draw_state(highlight_i=self.i, highlight_j=self.j, highlight_t=t)
+
+        # Draw state with extra highlights if RC4+
+        if getattr(self, 'last_tprime', None) is not None or getattr(self, 'last_tdouble', None) is not None:
+            self.draw_state(highlight_i=self.i, highlight_j=self.j, highlight_t=t,
+                            highlight_tprime=self.last_tprime, highlight_tdouble=self.last_tdouble)
+        else:
+            self.draw_state(highlight_i=self.i, highlight_j=self.j, highlight_t=t)
         
         self.prga_step += 1
         
@@ -294,7 +389,7 @@ class RC4Visualizer:
         self.auto_step()
         
     def auto_step(self):
-        if self.is_running and self.prga_step < len(self.plaintext):
+        if self.is_running and self.prga_step < len(self.plaintext_bytes):
             self.step_prga()
             self.root.after(self.animation_speed, self.auto_step)
         elif self.prga_step >= len(self.plaintext):
@@ -384,6 +479,15 @@ class RC4Visualizer:
                 fill_color = "lightyellow"
                 outline_color = "orange"
                 text_color = "orange"
+            # additional highlights (optional)
+            elif hasattr(self, 'last_tprime') and self.last_tprime is not None and idx == self.last_tprime:
+                fill_color = "lightgreen"
+                outline_color = "green"
+                text_color = "green"
+            elif hasattr(self, 'last_tdouble') and self.last_tdouble is not None and idx == self.last_tdouble:
+                fill_color = "lightpink"
+                outline_color = "magenta"
+                text_color = "magenta"
                 
             # Dibujar celda
             self.state_canvas.create_rectangle(x1, y1, x2, y2, 
@@ -422,6 +526,48 @@ class RC4Visualizer:
         except Exception:
             cipher_ascii = ''.join([chr(b) if 32 <= b < 127 else '.' for b in self.ciphertext])
         self.cipher_ascii_text.insert(1.0, cipher_ascii)
+
+    def on_algorithm_change(self):
+        # If user selects RC4+, force N=256 and disable size radios immediately
+        algo = self.algorithm_var.get()
+        if algo == 'RC4+':
+            if self.size_var.get() != 256:
+                self.log("WARNING: RC4+ requiere N=256 - forzando N=256", "red")
+            self.size_var.set(256)
+            for rb in getattr(self, 'size_radios', []):
+                rb.configure(state='disabled')
+        else:
+            for rb in getattr(self, 'size_radios', []):
+                rb.configure(state='normal')
+
+    def _run_rc4plus_test(self):
+        # Minimal internal test: KSA + RC4+ PRGA encrypt/decrypt consistency
+        self.log('\n--- RC4+ TEST START ---', 'blue')
+        # set parameters
+        self.algorithm_var.set('RC4+')
+        self.on_algorithm_change()
+        self.size_var.set(256)
+        self.N = 256
+        self.key_entry.delete(0, tk.END)
+        self.key_entry.insert(0, 'Key')
+        self.text_entry.delete(0, tk.END)
+        self.text_entry.insert(0, 'Plaintext')
+        # run KSA
+        self.init_ksa()
+        # run PRGA RC4+
+        steps = len(self.plaintext_bytes)
+        for _ in range(steps):
+            self.step_prga()
+        keystream_hex = ' '.join([f'{b:02x}' for b in self.keystream])
+        self.log(f'RC4+ keystream: {keystream_hex}', 'blue')
+        # decrypt: apply keystream to ciphertext to recover plaintext
+        recovered = bytes([c ^ k for c, k in zip(self.ciphertext, self.keystream)])
+        try:
+            recovered_text = recovered.decode('latin-1')
+        except Exception:
+            recovered_text = str(recovered)
+        self.log(f'Recovered text: {recovered_text}', 'blue')
+        self.log('--- RC4+ TEST END ---\n', 'blue')
         
     def display_results(self):
         """Mostrar resultados finales"""
