@@ -143,6 +143,7 @@ class RC4Visualizer:
         self.prga_step = 0
         self.keystream = []
         self.ciphertext = []
+        self.plaintext_bytes = b""
         
     def update_speed(self, value):
         self.animation_speed = int(float(value))
@@ -158,7 +159,13 @@ class RC4Visualizer:
         self.stop()
         self.N = self.size_var.get()
         self.key = self.key_entry.get()
+        # Read plaintext as latin-1 bytes to preserve raw byte values
         self.plaintext = self.text_entry.get()
+        try:
+            self.plaintext_bytes = self.plaintext.encode('latin-1')
+        except Exception:
+            # fallback: encode using latin-1 with replacement
+            self.plaintext_bytes = self.plaintext.encode('latin-1', 'replace')
         
         if not self.key:
             self.log("ERROR: Debe ingresar una clave", "red")
@@ -229,7 +236,7 @@ class RC4Visualizer:
             self.log("INICIANDO PRGA (Pseudo Random Generation Algorithm)", "purple")
             self.log("="*60, "purple")
             
-        if self.prga_step >= len(self.plaintext):
+        if self.prga_step >= len(self.plaintext_bytes):
             self.log("\n✓ PRGA completado - Todos los bytes procesados", "green")
             self.display_results()
             return
@@ -254,7 +261,9 @@ class RC4Visualizer:
         self.log(f"Output = S[t] = S[{t}] = {output_byte}")
         
         # XOR con el texto plano
-        plain_byte = ord(self.plaintext[self.prga_step])
+        # Operamos sobre bytes (0..255) para que espacios y bytes no imprimibles
+        # se manejen de forma reversible
+        plain_byte = self.plaintext_bytes[self.prga_step]
         cipher_byte = plain_byte ^ output_byte
         
         self.log(f"Plaintext[{self.prga_step}] = '{self.plaintext[self.prga_step]}' = {plain_byte}")
@@ -304,6 +313,7 @@ class RC4Visualizer:
         self.prga_step = 0
         self.keystream = []
         self.ciphertext = []
+        self.plaintext_bytes = b""
         
         self.log_text.delete(1.0, tk.END)
         self.original_text.delete(1.0, tk.END)
@@ -405,7 +415,12 @@ class RC4Visualizer:
         
         # Ciphertext ASCII
         self.cipher_ascii_text.delete(1.0, tk.END)
-        cipher_ascii = ''.join([chr(b) if 32 <= b < 127 else '.' for b in self.ciphertext])
+        try:
+            # Mostrar los bytes mapeados por latin-1 para que la representación
+            # sea reversible al copiar/pegar (cada byte -> un carácter)
+            cipher_ascii = bytes(self.ciphertext).decode('latin-1')
+        except Exception:
+            cipher_ascii = ''.join([chr(b) if 32 <= b < 127 else '.' for b in self.ciphertext])
         self.cipher_ascii_text.insert(1.0, cipher_ascii)
         
     def display_results(self):
