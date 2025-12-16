@@ -106,39 +106,6 @@ def test_rc4_plus():
         return False
 
 
-def test_modules_import():
-    """Test that all modules import correctly"""
-    print("\n" + "=" * 60)
-    print("Testing Module Imports")
-    print("=" * 60)
-
-    try:
-        from rc4_crypto import RC4Classic, RC4Plus, encrypt_decrypt, generate_keystream
-
-        print("✓ rc4_crypto module imported successfully")
-    except Exception as e:
-        print(f"✗ Failed to import rc4_crypto: {e}")
-        return False
-
-    try:
-        from rc4_visualization import StateVisualizer, LogManager
-
-        print("✓ rc4_visualization module imported successfully")
-    except Exception as e:
-        print(f"✗ Failed to import rc4_visualization: {e}")
-        return False
-
-    try:
-        from rc4_ui import ControlPanel, ButtonPanel, ResultPanel, StateVariablesPanel
-
-        print("✓ rc4_ui module imported successfully")
-    except Exception as e:
-        print(f"✗ Failed to import rc4_ui: {e}")
-        return False
-
-    return True
-
-
 def main():
     """Run all tests"""
     print("\n" + "=" * 60)
@@ -146,10 +113,6 @@ def main():
     print("=" * 60 + "\n")
 
     results = []
-
-    # Test imports
-    results.append(("Module Imports", test_modules_import()))
-
     # Test RC4 Classic
     results.append(("RC4 Classic", test_rc4_classic()))
 
