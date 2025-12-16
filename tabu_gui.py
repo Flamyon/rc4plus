@@ -1,628 +1,562 @@
-"""
-Tabu Search Attack GUI - Enhanced Educational Visualization
-Shows the attack process with detailed metrics and visual comparisons
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox
-import numpy as np
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
+import queue
+import math
 import logging
+from tabu_logic import generate_rc4_plus_keystream, TabuCracker
 
-from tabu_logic import TabuCracker, generate_rc4_plus_keystream
-
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
-class TabuAttackGUI:
-    """Enhanced GUI for Tabu Search State Recovery Attack"""
+class TabuAttackGUI(tk.Frame):
+    """
+    Educational GUI for Tabu Search RC4+ State Recovery Attack
+    """
 
-    def __init__(self, root):
-        self.root = root
-        self.root.title("RC4+ Tabu Search State Recovery Attack - Educational Mode")
-        self.root.geometry("1400x900")
+    def __init__(self, parent):
+        # Use a cross-platform compatible background color
+        bg_color = "#f0f0f0"  # Light gray, similar to SystemButtonFace
+        super().__init__(parent, bg=bg_color)
+        self.parent = parent
+        self.bg_color = bg_color
 
         # Attack state
         self.cracker = None
         self.target_state = None
         self.target_keystream = None
+        self.update_queue = queue.Queue()
         self.is_running = False
 
-        # Visualization data
-        self.fitness_history = []
-        self.hamming_distance_history = []
-        self.byte_matches_history = []
+        # UI update rate (ms)
+        self.update_interval = 100
 
-        self._create_widgets()
-        logger.info("Tabu Attack GUI initialized")
+        # Build the interface
+        self._build_ui()
 
-    def _create_widgets(self):
-        """Create all GUI widgets with educational layout"""
+        # Start UI update loop
+        self._schedule_ui_update()
 
-        # Main container with padding
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(0, weight=1)
+        logger.info("TabuSearchFrame initialized")
 
-        # Title section
-        title_label = ttk.Label(
-            main_frame,
-            text="RC4+ State Recovery using Tabu Search",
-            font=("Arial", 16, "bold"),
+    def _build_ui(self):
+        """Build the complete UI layout"""
+        # Configure grid weights for responsive layout
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=0)  # Left panel (fixed)
+        self.grid_columnconfigure(1, weight=1)  # Right panel (expandable)
+
+        # Create left and right panels
+        self._create_left_panel()
+        self._create_right_panel()
+
+    def _create_left_panel(self):
+        """Create left control panel"""
+        left_frame = tk.Frame(self, bg=self.bg_color, width=250)
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        left_frame.grid_propagate(False)
+
+        # Title
+        title = tk.Label(
+            left_frame,
+            text="Tabu Search Attack",
+            font=("Arial", 14, "bold"),
+            bg=self.bg_color,
         )
-        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 10))
+        title.pack(pady=(0, 20))
 
-        # Left column: Configuration and Control
-        self._create_control_panel(main_frame)
-
-        # Middle column: Metrics and Progress
-        self._create_metrics_panel(main_frame)
-
-        # Right column: Visualizations
-        self._create_visualization_panel(main_frame)
-
-    def _create_control_panel(self, parent):
-        """Create configuration and control panel"""
-        control_frame = ttk.LabelFrame(
-            parent, text="Attack Configuration", padding="10"
+        # Configuration section
+        config_frame = tk.LabelFrame(
+            left_frame,
+            text="Configuration",
+            bg=self.bg_color,
+            font=("Arial", 10, "bold"),
         )
-        control_frame.grid(
-            row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5)
-        )
+        config_frame.pack(fill="x", pady=(0, 10))
 
-        row = 0
-
-        # N-box size selection
-        ttk.Label(control_frame, text="S-box Size (N):").grid(
-            row=row, column=0, sticky=tk.W, pady=5
+        # N Size
+        tk.Label(config_frame, text="N Size:", bg=self.bg_color).pack(
+            anchor="w", padx=5, pady=(5, 0)
         )
-        self.n_var = tk.IntVar(value=64)
+        self.n_size_var = tk.StringVar(value="256")
         n_combo = ttk.Combobox(
-            control_frame,
-            textvariable=self.n_var,
-            values=[64, 128, 256],
+            config_frame,
+            textvariable=self.n_size_var,
+            values=["64", "128", "256"],
             state="readonly",
-            width=10,
+            width=15,
         )
-        n_combo.grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
+        n_combo.pack(padx=5, pady=(0, 5))
 
-        # Keystream length
-        ttk.Label(control_frame, text="Keystream Length:").grid(
-            row=row, column=0, sticky=tk.W, pady=5
+        # Keystream Length
+        tk.Label(config_frame, text="Keystream Length:", bg=self.bg_color).pack(
+            anchor="w", padx=5
         )
-        self.keystream_length_var = tk.IntVar(value=32)
-        ttk.Entry(control_frame, textvariable=self.keystream_length_var, width=12).grid(
-            row=row, column=1, sticky=tk.W, pady=5
+        self.keystream_length_var = tk.StringVar(value="32")
+        keystream_entry = tk.Entry(
+            config_frame, textvariable=self.keystream_length_var, width=18
         )
-        row += 1
+        keystream_entry.pack(padx=5, pady=(0, 5))
 
-        # Max iterations
-        ttk.Label(control_frame, text="Max Iterations:").grid(
-            row=row, column=0, sticky=tk.W, pady=5
+        # Max Iterations
+        tk.Label(config_frame, text="Max Iterations:", bg=self.bg_color).pack(
+            anchor="w", padx=5
         )
-        self.max_iterations_var = tk.IntVar(value=1000)
-        ttk.Entry(control_frame, textvariable=self.max_iterations_var, width=12).grid(
-            row=row, column=1, sticky=tk.W, pady=5
+        self.max_iterations_var = tk.StringVar(value="10000")
+        iterations_entry = tk.Entry(
+            config_frame, textvariable=self.max_iterations_var, width=18
         )
-        row += 1
-
-        ttk.Separator(control_frame, orient=tk.HORIZONTAL).grid(
-            row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10
-        )
-        row += 1
+        iterations_entry.pack(padx=5, pady=(0, 10))
 
         # Control buttons
-        self.generate_btn = ttk.Button(
-            control_frame, text="Generate Challenge", command=self._generate_challenge
-        )
-        self.generate_btn.grid(
-            row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5
-        )
-        row += 1
-
-        self.start_btn = ttk.Button(
-            control_frame,
+        self.start_button = tk.Button(
+            left_frame,
             text="Start Attack",
             command=self._start_attack,
-            state=tk.DISABLED,
+            bg="#4CAF50",
+            fg="white",
+            font=("Arial", 12, "bold"),
+            height=2,
+            cursor="hand2",
         )
-        self.start_btn.grid(
-            row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5
-        )
-        row += 1
+        self.start_button.pack(fill="x", pady=(0, 10))
 
-        self.stop_btn = ttk.Button(
-            control_frame,
-            text="Stop Attack",
+        self.stop_button = tk.Button(
+            left_frame,
+            text="Stop",
             command=self._stop_attack,
-            state=tk.DISABLED,
+            bg="#f44336",
+            fg="white",
+            font=("Arial", 12, "bold"),
+            height=2,
+            state="disabled",
+            cursor="hand2",
         )
-        self.stop_btn.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
-        row += 1
+        self.stop_button.pack(fill="x", pady=(0, 20))
 
-        self.reset_btn = ttk.Button(control_frame, text="Reset", command=self._reset)
-        self.reset_btn.grid(
-            row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5
+        # Status section
+        status_frame = tk.LabelFrame(
+            left_frame, text="Status", bg=self.bg_color, font=("Arial", 10, "bold")
         )
-        row += 1
+        status_frame.pack(fill="x", pady=(0, 10))
 
-        ttk.Separator(control_frame, orient=tk.HORIZONTAL).grid(
-            row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10
+        self.iteration_label = tk.Label(
+            status_frame, text="Iteration: 0", bg=self.bg_color, font=("Arial", 10)
         )
-        row += 1
+        self.iteration_label.pack(anchor="w", padx=5, pady=2)
 
-        # Algorithm explanation
-        explanation_text = (
-            "Tabu Search Configuration (Z2):\n\n"
-            "• Neighborhood: 50% of all swaps\n"
-            "• Tabu Horizon: N(N-1)/4\n"
-            "• Fitness: Byte matches\n"
-            "• Aspiration: Accept if better\n"
-            "  than best found\n\n"
-            "The algorithm explores S-box\n"
-            "permutations to match the\n"
-            "target keystream."
+        self.fitness_label = tk.Label(
+            status_frame, text="Fitness: 0/0", bg=self.bg_color, font=("Arial", 10)
         )
-        explanation_label = ttk.Label(
-            control_frame, text=explanation_text, justify=tk.LEFT, font=("Arial", 9)
+        self.fitness_label.pack(anchor="w", padx=5, pady=2)
+
+        self.best_fitness_label = tk.Label(
+            status_frame,
+            text="Best Fitness: 0/0",
+            bg=self.bg_color,
+            font=("Arial", 10),
         )
-        explanation_label.grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
+        self.best_fitness_label.pack(anchor="w", padx=5, pady=2)
 
-    def _create_metrics_panel(self, parent):
-        """Create metrics and progress panel"""
-        metrics_frame = ttk.LabelFrame(parent, text="Attack Metrics", padding="10")
-        metrics_frame.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5)
-
-        row = 0
-
-        # Current iteration
-        ttk.Label(metrics_frame, text="Iteration:", font=("Arial", 10, "bold")).grid(
-            row=row, column=0, sticky=tk.W, pady=5
+        self.tabu_size_label = tk.Label(
+            status_frame, text="Tabu Size: 0", bg=self.bg_color, font=("Arial", 10)
         )
-        self.iteration_label = ttk.Label(metrics_frame, text="0")
-        self.iteration_label.grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
+        self.tabu_size_label.pack(anchor="w", padx=5, pady=(2, 5))
 
-        # Current fitness
-        ttk.Label(
-            metrics_frame, text="Current Fitness:", font=("Arial", 10, "bold")
-        ).grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.current_fitness_label = ttk.Label(metrics_frame, text="0 / 0 (0.00%)")
-        self.current_fitness_label.grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
+    def _create_right_panel(self):
+        """Create right visualization panel"""
+        right_frame = tk.Frame(self, bg=self.bg_color)
+        right_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
-        # Best fitness
-        ttk.Label(metrics_frame, text="Best Fitness:", font=("Arial", 10, "bold")).grid(
-            row=row, column=0, sticky=tk.W, pady=5
+        # Configure grid for three zones
+        right_frame.grid_rowconfigure(0, weight=3)  # S-Boxes (larger)
+        right_frame.grid_rowconfigure(1, weight=1)  # Tabu List
+        right_frame.grid_rowconfigure(2, weight=0)  # Keystream (fixed)
+        right_frame.grid_columnconfigure(0, weight=1)
+
+        # Zone 1: S-Boxes
+        self._create_sbox_zone(right_frame)
+
+        # Zone 2: Tabu List
+        self._create_tabu_zone(right_frame)
+
+        # Zone 3: Keystream
+        self._create_keystream_zone(right_frame)
+
+    def _create_sbox_zone(self, parent):
+        """Create S-Box visualization zone"""
+        sbox_frame = tk.Frame(parent, bg=self.bg_color)
+        sbox_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
+
+        # Configure grid for two canvases side by side
+        sbox_frame.grid_rowconfigure(0, weight=0)  # Title row
+        sbox_frame.grid_rowconfigure(1, weight=1)  # Canvas row
+        sbox_frame.grid_columnconfigure(0, weight=1)
+        sbox_frame.grid_columnconfigure(1, weight=1)
+
+        # Target S-Box (Left)
+        target_label = tk.Label(
+            sbox_frame,
+            text="Target S-Box (Objetivo Secreto)",
+            font=("Arial", 11, "bold"),
+            bg=self.bg_color,
         )
-        self.best_fitness_label = ttk.Label(
-            metrics_frame, text="0 / 0 (0.00%)", foreground="blue"
+        target_label.grid(row=0, column=0, pady=(0, 5))
+
+        self.target_canvas = tk.Canvas(
+            sbox_frame, bg="white", highlightthickness=1, highlightbackground="gray"
         )
-        self.best_fitness_label.grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
+        self.target_canvas.grid(row=1, column=0, sticky="nsew", padx=(0, 5))
 
-        # Hamming distance to target
-        ttk.Label(
-            metrics_frame, text="Hamming Distance:", font=("Arial", 10, "bold")
-        ).grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.hamming_label = ttk.Label(metrics_frame, text="N/A")
-        self.hamming_label.grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-
-        # Tabu list size
-        ttk.Label(
-            metrics_frame, text="Tabu List Size:", font=("Arial", 10, "bold")
-        ).grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.tabu_size_label = ttk.Label(metrics_frame, text="0")
-        self.tabu_size_label.grid(row=row, column=1, sticky=tk.W, pady=5)
-        row += 1
-
-        ttk.Separator(metrics_frame, orient=tk.HORIZONTAL).grid(
-            row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10
+        # Candidate S-Box (Right)
+        candidate_label = tk.Label(
+            sbox_frame,
+            text="Candidate S-Box (Algoritmo)",
+            font=("Arial", 11, "bold"),
+            bg=self.bg_color,
         )
-        row += 1
+        candidate_label.grid(row=0, column=1, pady=(0, 5))
 
-        # Progress visualization
-        ttk.Label(
-            metrics_frame, text="Attack Progress:", font=("Arial", 10, "bold")
-        ).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
-        row += 1
-
-        self.progress_bar = ttk.Progressbar(
-            metrics_frame, orient=tk.HORIZONTAL, length=300, mode="determinate"
+        self.candidate_canvas = tk.Canvas(
+            sbox_frame, bg="white", highlightthickness=1, highlightbackground="gray"
         )
-        self.progress_bar.grid(
-            row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5
+        self.candidate_canvas.grid(row=1, column=1, sticky="nsew", padx=(5, 0))
+
+    def _create_tabu_zone(self, parent):
+        """Create Tabu List visualization zone"""
+        tabu_frame = tk.LabelFrame(
+            parent,
+            text="Tabu List (Movimientos Prohibidos)",
+            bg=self.bg_color,
+            font=("Arial", 10, "bold"),
         )
-        row += 1
+        tabu_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 10))
 
-        ttk.Separator(metrics_frame, orient=tk.HORIZONTAL).grid(
-            row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10
+        # Configure grid
+        tabu_frame.grid_rowconfigure(0, weight=1)
+        tabu_frame.grid_columnconfigure(0, weight=1)
+        tabu_frame.grid_columnconfigure(1, weight=0)
+
+        # Listbox with scrollbar
+        self.tabu_listbox = tk.Listbox(tabu_frame, font=("Courier", 9), bg="white")
+        self.tabu_listbox.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        scrollbar = tk.Scrollbar(tabu_frame, command=self.tabu_listbox.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns", pady=5, padx=(0, 5))
+        self.tabu_listbox.config(yscrollcommand=scrollbar.set)
+
+    def _create_keystream_zone(self, parent):
+        """Create Keystream comparison zone"""
+        keystream_frame = tk.LabelFrame(
+            parent,
+            text="Keystream Comparison",
+            bg=self.bg_color,
+            font=("Arial", 10, "bold"),
         )
-        row += 1
+        keystream_frame.grid(row=2, column=0, sticky="ew")
 
-        # Keystream comparison section
-        ttk.Label(
-            metrics_frame, text="Keystream Comparison:", font=("Arial", 10, "bold")
-        ).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=5)
-        row += 1
+        # Target keystream
+        target_ks_frame = tk.Frame(keystream_frame, bg=self.bg_color)
+        target_ks_frame.pack(fill="x", padx=5, pady=(5, 2))
 
-        # Create a frame for keystream display
-        keystream_frame = ttk.Frame(metrics_frame)
-        keystream_frame.grid(
-            row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5
+        tk.Label(
+            target_ks_frame,
+            text="Target Output:",
+            font=("Arial", 9, "bold"),
+            bg=self.bg_color,
+            width=15,
+            anchor="w",
+        ).pack(side="left")
+
+        self.target_ks_label = tk.Label(
+            target_ks_frame,
+            text="",
+            font=("Courier", 9),
+            bg="white",
+            anchor="w",
+            relief="sunken",
         )
+        self.target_ks_label.pack(side="left", fill="x", expand=True)
 
-        # Target keystream (scrollable)
-        ttk.Label(keystream_frame, text="Target:").grid(row=0, column=0, sticky=tk.W)
-        self.target_keystream_text = tk.Text(
-            keystream_frame, height=3, width=40, wrap=tk.WORD, font=("Courier", 8)
+        # Actual keystream
+        actual_ks_frame = tk.Frame(keystream_frame, bg=self.bg_color)
+        actual_ks_frame.pack(fill="x", padx=5, pady=(2, 5))
+
+        tk.Label(
+            actual_ks_frame,
+            text="Actual Output:",
+            font=("Arial", 9, "bold"),
+            bg=self.bg_color,
+            width=15,
+            anchor="w",
+        ).pack(side="left")
+
+        self.actual_ks_canvas = tk.Canvas(
+            actual_ks_frame,
+            height=25,
+            bg="white",
+            highlightthickness=1,
+            highlightbackground="gray",
         )
-        self.target_keystream_text.grid(row=1, column=0, sticky=(tk.W, tk.E))
-        target_scroll = ttk.Scrollbar(
-            keystream_frame,
-            orient=tk.VERTICAL,
-            command=self.target_keystream_text.yview,
-        )
-        target_scroll.grid(row=1, column=1, sticky=(tk.N, tk.S))
-        self.target_keystream_text["yscrollcommand"] = target_scroll.set
+        self.actual_ks_canvas.pack(side="left", fill="x", expand=True)
 
-        # Predicted keystream (scrollable)
-        ttk.Label(keystream_frame, text="Predicted:").grid(
-            row=2, column=0, sticky=tk.W, pady=(10, 0)
-        )
-        self.predicted_keystream_text = tk.Text(
-            keystream_frame, height=3, width=40, wrap=tk.WORD, font=("Courier", 8)
-        )
-        self.predicted_keystream_text.grid(row=3, column=0, sticky=(tk.W, tk.E))
-        predicted_scroll = ttk.Scrollbar(
-            keystream_frame,
-            orient=tk.VERTICAL,
-            command=self.predicted_keystream_text.yview,
-        )
-        predicted_scroll.grid(row=3, column=1, sticky=(tk.N, tk.S))
-        self.predicted_keystream_text["yscrollcommand"] = predicted_scroll.set
+    def _draw_sbox(self, canvas, sbox_array, target_sbox=None):
+        """Draw S-Box as a grid on canvas"""
+        canvas.delete("all")
 
-        # Status message
-        row += 1
-        self.status_label = ttk.Label(
-            metrics_frame, text="Ready to generate challenge", foreground="green"
-        )
-        self.status_label.grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=10)
+        if sbox_array is None:
+            return
 
-    def _create_visualization_panel(self, parent):
-        """Create visualization panel with plots"""
-        viz_frame = ttk.LabelFrame(parent, text="Visual Analysis", padding="10")
-        viz_frame.grid(row=1, column=2, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(5, 0))
+        N = len(sbox_array)
 
-        # Create matplotlib figure with subplots
-        self.fig = Figure(figsize=(6, 8), dpi=100)
+        # Calculate grid dimensions
+        grid_size = int(math.sqrt(N))
+        if grid_size * grid_size < N:
+            grid_size += 1
 
-        # Fitness evolution plot
-        self.ax_fitness = self.fig.add_subplot(311)
-        self.ax_fitness.set_title("Fitness Evolution")
-        self.ax_fitness.set_xlabel("Iteration")
-        self.ax_fitness.set_ylabel("Byte Matches")
-        self.ax_fitness.grid(True, alpha=0.3)
+        # Get canvas dimensions
+        canvas.update_idletasks()
+        canvas_width = canvas.winfo_width()
+        canvas_height = canvas.winfo_height()
 
-        # Hamming distance plot
-        self.ax_hamming = self.fig.add_subplot(312)
-        self.ax_hamming.set_title("Hamming Distance to Target")
-        self.ax_hamming.set_xlabel("Iteration")
-        self.ax_hamming.set_ylabel("Distance")
-        self.ax_hamming.grid(True, alpha=0.3)
+        if canvas_width < 10 or canvas_height < 10:
+            canvas_width = 400
+            canvas_height = 400
 
-        # S-box comparison heatmap
-        self.ax_sbox = self.fig.add_subplot(313)
-        self.ax_sbox.set_title("S-box Position Differences")
-        self.ax_sbox.set_xlabel("Position")
-        self.ax_sbox.set_ylabel("Difference")
+        # Calculate cell size
+        cell_width = canvas_width / grid_size
+        cell_height = canvas_height / grid_size
 
-        self.fig.tight_layout()
+        # Draw grid
+        for idx in range(N):
+            row = idx // grid_size
+            col = idx % grid_size
 
-        # Embed in tkinter
-        self.canvas = FigureCanvasTkAgg(self.fig, master=viz_frame)
-        self.canvas.draw()
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            x1 = col * cell_width
+            y1 = row * cell_height
+            x2 = x1 + cell_width
+            y2 = y1 + cell_height
 
-    def _generate_challenge(self):
-        """Generate a new challenge (target state and keystream)"""
-        try:
-            N = self.n_var.get()
-            keystream_length = self.keystream_length_var.get()
+            # Determine cell color
+            if target_sbox is not None:
+                # Candidate S-Box: color based on match
+                if sbox_array[idx] == target_sbox[idx]:
+                    fill_color = "lightgreen"
+                else:
+                    fill_color = "lightcoral"
+            else:
+                # Target S-Box: standard color
+                fill_color = "white"
 
-            logger.info(f"Generating challenge: N={N}, length={keystream_length}")
-            self.status_label.config(
-                text="Generating challenge...", foreground="orange"
+            # Draw cell
+            canvas.create_rectangle(x1, y1, x2, y2, fill=fill_color, outline="gray")
+
+            # Draw value (only if cell is large enough)
+            if cell_width > 20 and cell_height > 15:
+                value_text = (
+                    f"{sbox_array[idx]:02X}" if N <= 256 else str(sbox_array[idx])
+                )
+                font_size = max(6, min(10, int(cell_height / 2)))
+                canvas.create_text(
+                    (x1 + x2) / 2,
+                    (y1 + y2) / 2,
+                    text=value_text,
+                    font=("Courier", font_size),
+                    fill="black",
+                )
+
+    def _draw_keystream_comparison(self, target_ks, actual_ks):
+        """Draw keystream comparison with color coding"""
+        canvas = self.actual_ks_canvas
+        canvas.delete("all")
+
+        if target_ks is None or actual_ks is None:
+            return
+
+        # Limit display to first 20 bytes
+        display_length = min(20, len(target_ks))
+
+        # Update target label
+        target_text = " ".join([f"{b:02X}" for b in target_ks[:display_length]])
+        if len(target_ks) > display_length:
+            target_text += "..."
+        self.target_ks_label.config(text=target_text)
+
+        # Draw actual keystream with color coding
+        canvas.update_idletasks()
+        canvas_width = canvas.winfo_width()
+        if canvas_width < 10:
+            canvas_width = 600
+
+        cell_width = canvas_width / display_length
+
+        for i in range(display_length):
+            x1 = i * cell_width
+            x2 = x1 + cell_width
+
+            # Determine color
+            if actual_ks[i] == target_ks[i]:
+                fill_color = "lightgreen"
+            else:
+                fill_color = "lightcoral"
+
+            # Draw cell
+            canvas.create_rectangle(x1, 2, x2, 23, fill=fill_color, outline="gray")
+
+            # Draw value
+            canvas.create_text(
+                (x1 + x2) / 2,
+                12,
+                text=f"{actual_ks[i]:02X}",
+                font=("Courier", 9),
+                fill="black",
             )
-            self.root.update()
 
-            self.target_state, self.target_keystream = generate_rc4_plus_keystream(
-                N, keystream_length
-            )
+    def _update_tabu_list(self, tabu_deque):
+        """Update tabu list display"""
+        self.tabu_listbox.delete(0, tk.END)
 
-            # Display target keystream
-            self._display_keystream(self.target_keystream_text, self.target_keystream)
-            self.predicted_keystream_text.delete(1.0, tk.END)
+        if tabu_deque is None or len(tabu_deque) == 0:
+            return
 
-            # Reset visualization data
-            self.fitness_history = []
-            self.hamming_distance_history = []
-            self.byte_matches_history = []
+        for move in tabu_deque:
+            move_text = f"Swap({move[0]:3d}, {move[1]:3d})"
+            self.tabu_listbox.insert(tk.END, move_text)
 
-            self.status_label.config(
-                text=f"Challenge generated! N={N}, Keystream length={keystream_length}",
-                foreground="green",
-            )
-            self.start_btn.config(state=tk.NORMAL)
-            logger.info("Challenge generated successfully")
-
-        except Exception as e:
-            logger.error(f"Error generating challenge: {e}", exc_info=True)
-            messagebox.showerror("Error", f"Failed to generate challenge:\n{e}")
-            self.status_label.config(
-                text="Error generating challenge", foreground="red"
-            )
-
-    def _display_keystream(self, text_widget, keystream):
-        """Display keystream in text widget with formatting"""
-        text_widget.delete(1.0, tk.END)
-        # Format as hex: XX XX XX ...
-        hex_str = " ".join(f"{byte:02X}" for byte in keystream)
-        text_widget.insert(1.0, hex_str)
+        # Auto-scroll to bottom
+        self.tabu_listbox.see(tk.END)
 
     def _start_attack(self):
         """Start the Tabu Search attack"""
         try:
-            if self.target_keystream is None:
-                messagebox.showwarning("Warning", "Please generate a challenge first!")
-                return
+            # Get parameters
+            N = int(self.n_size_var.get())
+            keystream_length = int(self.keystream_length_var.get())
+            max_iterations = int(self.max_iterations_var.get())
 
-            N = self.n_var.get()
-            max_iterations = self.max_iterations_var.get()
+            # Validate parameters
+            if keystream_length < 1 or keystream_length > 256:
+                raise ValueError("Keystream length must be between 1 and 256")
+            if max_iterations < 1:
+                raise ValueError("Max iterations must be positive")
 
-            logger.info(f"Starting attack: N={N}, max_iterations={max_iterations}")
-            self.status_label.config(text="Attack running...", foreground="blue")
+            logger.info(
+                f"Starting attack: N={N}, length={keystream_length}, max_iter={max_iterations}"
+            )
+
+            # Generate challenge
+            self.target_state, self.target_keystream = generate_rc4_plus_keystream(
+                N, keystream_length
+            )
+
+            # Draw target S-Box
+            self._draw_sbox(self.target_canvas, self.target_state)
 
             # Initialize cracker
             self.cracker = TabuCracker(
                 self.target_keystream, N=N, target_state=self.target_state
             )
 
-            # Reset histories
-            self.fitness_history = []
-            self.hamming_distance_history = []
-            self.byte_matches_history = []
-
             # Update UI state
             self.is_running = True
-            self.start_btn.config(state=tk.DISABLED)
-            self.stop_btn.config(state=tk.NORMAL)
-            self.generate_btn.config(state=tk.DISABLED)
+            self.start_button.config(state="disabled")
+            self.stop_button.config(state="normal")
+            self.n_size_var.set(str(N))  # Lock value
 
             # Start attack in background
-            self.cracker.run(
-                max_iterations=max_iterations, callback=self._update_callback
-            )
+            def callback(stats):
+                self.update_queue.put(stats)
 
-            logger.info("Attack started")
+            self.cracker.run(max_iterations=max_iterations, callback=callback)
+
+            logger.info("Attack started successfully")
 
         except Exception as e:
-            logger.error(f"Error starting attack: {e}", exc_info=True)
-            messagebox.showerror("Error", f"Failed to start attack:\n{e}")
-            self.status_label.config(text="Error starting attack", foreground="red")
+            logger.error(f"Failed to start attack: {e}", exc_info=True)
+            messagebox.showerror("Error", f"Failed to start attack:\n{str(e)}")
+            self._stop_attack()
 
     def _stop_attack(self):
         """Stop the running attack"""
+        self.is_running = False
+
         if self.cracker:
             self.cracker.stop()
-        self.is_running = False
-        self.start_btn.config(state=tk.NORMAL)
-        self.stop_btn.config(state=tk.DISABLED)
-        self.generate_btn.config(state=tk.NORMAL)
-        self.status_label.config(text="Attack stopped", foreground="orange")
-        logger.info("Attack stopped by user")
 
-    def _reset(self):
-        """Reset the GUI to initial state"""
-        if self.is_running:
-            self._stop_attack()
+        self.start_button.config(state="normal")
+        self.stop_button.config(state="disabled")
 
-        self.cracker = None
-        self.target_state = None
-        self.target_keystream = None
-        self.fitness_history = []
-        self.hamming_distance_history = []
-        self.byte_matches_history = []
+        logger.info("Attack stopped")
 
-        # Reset labels
-        self.iteration_label.config(text="0")
-        self.current_fitness_label.config(text="0 / 0 (0.00%)")
-        self.best_fitness_label.config(text="0 / 0 (0.00%)")
-        self.hamming_label.config(text="N/A")
-        self.tabu_size_label.config(text="0")
-        self.progress_bar["value"] = 0
+    def _schedule_ui_update(self):
+        """Schedule periodic UI updates"""
+        self._process_update_queue()
+        self.after(self.update_interval, self._schedule_ui_update)
 
-        # Clear text widgets
-        self.target_keystream_text.delete(1.0, tk.END)
-        self.predicted_keystream_text.delete(1.0, tk.END)
-
-        # Clear plots
-        for ax in [self.ax_fitness, self.ax_hamming, self.ax_sbox]:
-            ax.clear()
-        self.ax_fitness.set_title("Fitness Evolution")
-        self.ax_fitness.grid(True, alpha=0.3)
-        self.ax_hamming.set_title("Hamming Distance to Target")
-        self.ax_hamming.grid(True, alpha=0.3)
-        self.ax_sbox.set_title("S-box Position Differences")
-        self.canvas.draw()
-
-        self.start_btn.config(state=tk.DISABLED)
-        self.stop_btn.config(state=tk.DISABLED)
-        self.generate_btn.config(state=tk.NORMAL)
-        self.status_label.config(text="Ready to generate challenge", foreground="green")
-        logger.info("GUI reset")
-
-    def _update_callback(self, stats):
-        """Callback function for attack updates"""
+    def _process_update_queue(self):
+        """Process all pending updates from the queue"""
         try:
-            self.root.after(0, lambda: self._update_ui(stats))
-        except Exception as e:
-            logger.error(f"Error in update callback: {e}", exc_info=True)
+            while True:
+                stats = self.update_queue.get_nowait()
+                self._update_ui(stats)
+        except queue.Empty:
+            pass
 
     def _update_ui(self, stats):
-        """Update UI with attack statistics"""
+        """Update UI with current statistics"""
         try:
-            iteration = stats["iteration"]
-            current_fitness = stats["current_fitness"]
-            best_fitness = stats["best_fitness"]
-            tabu_size = stats["tabu_size"]
-            keystream_length = len(self.target_keystream)
+            # Update status labels
+            self.iteration_label.config(text=f"Iteration: {stats['iteration']}")
 
-            # Update labels
-            self.iteration_label.config(text=str(iteration))
-
-            current_pct = (current_fitness / keystream_length) * 100
-            self.current_fitness_label.config(
-                text=f"{current_fitness} / {keystream_length} ({current_pct:.2f}%)"
+            keystream_length = len(stats["target_keystream"])
+            self.fitness_label.config(
+                text=f"Fitness: {stats['current_fitness']}/{keystream_length}"
             )
-
-            best_pct = (best_fitness / keystream_length) * 100
             self.best_fitness_label.config(
-                text=f"{best_fitness} / {keystream_length} ({best_pct:.2f}%)"
+                text=f"Best Fitness: {stats['best_fitness']}/{keystream_length}"
+            )
+            self.tabu_size_label.config(text=f"Tabu Size: {stats['tabu_size']}")
+
+            # Update S-Box visualizations
+            self._draw_sbox(
+                self.candidate_canvas,
+                stats["current_candidate"],
+                target_sbox=stats["target_state"],
             )
 
-            self.tabu_size_label.config(text=str(tabu_size))
+            # Update keystream comparison
+            self._draw_keystream_comparison(
+                stats["target_keystream"], stats["predicted_keystream"]
+            )
 
-            # Calculate Hamming distance if target state is available
-            if self.target_state is not None:
-                hamming_dist = np.sum(stats["best_candidate"] != self.target_state)
-                self.hamming_label.config(text=f"{hamming_dist} / {self.n_var.get()}")
-                self.hamming_distance_history.append(hamming_dist)
+            # Update tabu list
+            if self.cracker:
+                self._update_tabu_list(self.cracker.tabu_deque)
 
-            # Update progress bar
-            max_iter = self.max_iterations_var.get()
-            progress = (iteration / max_iter) * 100
-            self.progress_bar["value"] = progress
-
-            # Update histories
-            self.fitness_history.append(best_fitness)
-            self.byte_matches_history.append(current_fitness)
-
-            # Update keystream display
-            if "predicted_keystream" in stats:
-                self._display_keystream(
-                    self.predicted_keystream_text, stats["predicted_keystream"]
-                )
-
-            # Update plots every 10 iterations to reduce overhead
-            if iteration % 10 == 0 or best_fitness == keystream_length:
-                self._update_plots()
-
-            # Check if attack completed
-            if best_fitness == keystream_length:
-                self.status_label.config(
-                    text=f"✓ Attack successful! State recovered in {iteration} iterations",
-                    foreground="green",
-                )
+            # Check for completion
+            if stats["best_fitness"] == keystream_length:
                 self._stop_attack()
                 messagebox.showinfo(
-                    "Success",
-                    f"State recovered successfully!\n\n"
-                    f"Iterations: {iteration}\n"
-                    f"Final fitness: {best_fitness}/{keystream_length}",
-                )
-            elif not self.is_running:
-                self.status_label.config(
-                    text=f"Attack stopped at iteration {iteration}",
-                    foreground="orange",
+                    "Success!", f"State recovered in {stats['iteration']} iterations!"
                 )
 
         except Exception as e:
             logger.error(f"Error updating UI: {e}", exc_info=True)
 
-    def _update_plots(self):
-        """Update visualization plots"""
-        try:
-            # Clear previous plots
-            self.ax_fitness.clear()
-            self.ax_hamming.clear()
-            self.ax_sbox.clear()
-
-            # Plot fitness evolution
-            if len(self.fitness_history) > 0:
-                iterations = list(range(1, len(self.fitness_history) + 1))
-                self.ax_fitness.plot(
-                    iterations, self.fitness_history, "b-", label="Best", linewidth=2
-                )
-                if len(self.byte_matches_history) > 0:
-                    self.ax_fitness.plot(
-                        iterations,
-                        self.byte_matches_history,
-                        "g-",
-                        label="Current",
-                        alpha=0.5,
-                    )
-                self.ax_fitness.axhline(
-                    y=len(self.target_keystream),
-                    color="r",
-                    linestyle="--",
-                    label="Target",
-                )
-                self.ax_fitness.set_title("Fitness Evolution")
-                self.ax_fitness.set_xlabel("Iteration")
-                self.ax_fitness.set_ylabel("Byte Matches")
-                self.ax_fitness.legend()
-                self.ax_fitness.grid(True, alpha=0.3)
-
-            # Plot Hamming distance
-            if len(self.hamming_distance_history) > 0:
-                iterations = list(range(1, len(self.hamming_distance_history) + 1))
-                self.ax_hamming.plot(
-                    iterations, self.hamming_distance_history, "r-", linewidth=2
-                )
-                self.ax_hamming.set_title("Hamming Distance to Target S-box")
-                self.ax_hamming.set_xlabel("Iteration")
-                self.ax_hamming.set_ylabel("Distance (positions)")
-                self.ax_hamming.grid(True, alpha=0.3)
-
-            # Plot S-box differences (bar chart of differences)
-            if self.cracker and self.target_state is not None:
-                state = self.cracker.get_current_state()
-                best_candidate = state["best_candidate"]
-                differences = np.abs(
-                    best_candidate.astype(int) - self.target_state.astype(int)
-                )
-
-                # Sample points for visualization if N is large
-                N = len(differences)
-                if N > 64:
-                    sample_indices = np.linspace(0, N - 1, 64, dtype=int)
-                    differences = differences[sample_indices]
-                    positions = sample_indices
-                else:
-                    positions = np.arange(N)
-
-                self.ax_sbox.bar(positions, differences, color="purple", alpha=0.6)
-                self.ax_sbox.set_title(f"S-box Value Differences (N={N})")
-                self.ax_sbox.set_xlabel("Position")
-                self.ax_sbox.set_ylabel("Absolute Difference")
-                self.ax_sbox.grid(True, alpha=0.3, axis="y")
-
-            self.fig.tight_layout()
-            self.canvas.draw()
-
-        except Exception as e:
-            logger.error(f"Error updating plots: {e}", exc_info=True)
-
 
 def main():
-    """Main entry point for the GUI"""
+    """Main entry point"""
     root = tk.Tk()
-    TabuAttackGUI(root)
+    root.title("RC4+ Tabu Search Attack - Educational Tool")
+    root.geometry("1400x900")
+
+    # Create main frame
+    app = TabuAttackGUI(root)
+    app.pack(fill="both", expand=True)
+
     root.mainloop()
 
 

@@ -376,34 +376,28 @@ class RC4Visualizer:
         self.log_manager.log("--- RC4+ TEST END ---\n", "blue")
 
     def open_tabu_window(self):
-        """Abre la interfaz del ataque Tabu en una nueva ventana Toplevel."""
-        # Comprobar si ya hay una ventana abierta
-        if hasattr(self, "tabu_window") and self.tabu_window.winfo_exists():
-            self.tabu_window.lift()
-            return
+        """Open Tabu Search attack window"""
+        tabu_window = tk.Toplevel(self.root)
+        tabu_window.title("Tabu Search State Recovery Attack")
+        tabu_window.geometry("1400x900")
 
-        self.tabu_window = tk.Toplevel(self.root)
-        self.tabu_window.title("RC4+ Tabu Search State Recovery Attack")
-        self.tabu_window.geometry("1200x700")
+        # Create TabuAttackGUI instance - it IS a Frame itself
+        tabu_gui = TabuAttackGUI(tabu_window)
 
-        # Instanciar el frame dentro de la nueva ventana
-        tabu_frame = TabuAttackGUI(self.tabu_window)
-        tabu_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # Pack the TabuAttackGUI directly (it's already a Frame)
+        tabu_gui.pack(fill=tk.BOTH, expand=True)
 
         # Manejar el cierre de la ventana para detener el hilo del ataque
         def on_close():
-            # Intentamos parar el ataque si está corriendo
-            # Probamos ambos nombres de métodos por seguridad según la versión de tabu_gui
-            if hasattr(tabu_frame, "_stop"):
-                tabu_frame._stop()
-            elif hasattr(tabu_frame, "_stop_attack"):
-                tabu_frame._stop_attack()
-            elif hasattr(tabu_frame, "cracker") and tabu_frame.cracker:
-                tabu_frame.cracker.stop()
+            # Stop the attack if it's running
+            if hasattr(tabu_gui, "_stop_attack"):
+                tabu_gui._stop_attack()
+            elif hasattr(tabu_gui, "cracker") and tabu_gui.cracker:
+                tabu_gui.cracker.stop()
 
-            self.tabu_window.destroy()
+            tabu_window.destroy()
 
-        self.tabu_window.protocol("WM_DELETE_WINDOW", on_close)
+        tabu_window.protocol("WM_DELETE_WINDOW", on_close)
 
 
 def main():
