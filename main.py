@@ -15,7 +15,7 @@ import time
 import sys
 
 # Importamos la ventana del ataque
-from tabu_gui import TabuSearchFrame
+from tabu_gui import TabuAttackGUI
 
 from rc4_crypto import RC4Classic, RC4Plus
 from rc4_visualization import StateVisualizer, LogManager
@@ -387,7 +387,7 @@ class RC4Visualizer:
         self.tabu_window.geometry("1200x700")
 
         # Instanciar el frame dentro de la nueva ventana
-        tabu_frame = TabuSearchFrame(self.tabu_window)
+        tabu_frame = TabuAttackGUI(self.tabu_window)
         tabu_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Manejar el cierre de la ventana para detener el hilo del ataque

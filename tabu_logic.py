@@ -172,13 +172,14 @@ class TabuCracker:
     Tabu Search attack to recover RC4+ internal state (S-box permutation)
     """
 
-    def __init__(self, target_keystream, N=256):
+    def __init__(self, target_keystream, N=256, target_state=None):
         """
         Initialize Tabu Search cracker
 
         Args:
             target_keystream: numpy array of target keystream bytes to match
             N: size of S-box (64, 128, or 256)
+            target_state: optional, the actual target S-box for visualization
         """
         logger.info(
             f"Initializing TabuCracker: N={N}, keystream_length={len(target_keystream)}"
@@ -191,6 +192,9 @@ class TabuCracker:
         self.N = N
         self.target_keystream = np.array(target_keystream, dtype=np.uint8)
         self.keystream_length = len(target_keystream)
+
+        # Store target state for visualization (optional)
+        self.target_state = target_state.copy() if target_state is not None else None
 
         # Z2 Configuration - All parameters scale with N
         self.total_swaps = (N * (N - 1)) // 2
@@ -232,6 +236,11 @@ class TabuCracker:
         # Search state
         self.iteration = 0
         self.current_fitness = self.best_fitness
+
+        # Store current predicted keystream for visualization
+        self.current_predicted_keystream = self._generate_keystream(
+            self.current_candidate
+        )
 
         # Threading
         self.running = False
@@ -352,6 +361,11 @@ class TabuCracker:
                 self.current_candidate = best_neighbor
                 self.current_fitness = best_neighbor_fitness
 
+                # Update predicted keystream for visualization
+                self.current_predicted_keystream = self._generate_keystream(
+                    self.current_candidate
+                )
+
                 if best_neighbor_fitness > self.best_fitness:
                     logger.info(
                         f"New best fitness: {best_neighbor_fitness}/{self.keystream_length} "
@@ -377,6 +391,12 @@ class TabuCracker:
                 "tabu_size": len(self.tabu_deque),
                 "move_accepted": best_move,
                 "best_candidate": self.best_candidate.copy(),
+                "current_candidate": self.current_candidate.copy(),
+                "target_state": (
+                    self.target_state.copy() if self.target_state is not None else None
+                ),
+                "predicted_keystream": self.current_predicted_keystream.copy(),
+                "target_keystream": self.target_keystream.copy(),
             }
 
     def run(self, max_iterations=1000, callback=None):
@@ -423,4 +443,9 @@ class TabuCracker:
                 "best_fitness": self.best_fitness,
                 "iteration": self.iteration,
                 "tabu_size": len(self.tabu_deque),
+                "target_state": (
+                    self.target_state.copy() if self.target_state is not None else None
+                ),
+                "predicted_keystream": self.current_predicted_keystream.copy(),
+                "target_keystream": self.target_keystream.copy(),
             }
