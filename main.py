@@ -12,10 +12,17 @@ Arquitectura modular:
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 import time
+import sys
+
+# Importamos la ventana del ataque
+from tabu_gui import TabuSearchFrame
 
 from rc4_crypto import RC4Classic, RC4Plus
 from rc4_visualization import StateVisualizer, LogManager
 from rc4_ui import ControlPanel, ButtonPanel, ResultPanel, StateVariablesPanel
+
+# Ajusta esta ruta si es necesario, o bórrala si los archivos están en la misma carpeta
+sys.path.append("/home/mregidorgarcia/proyectos/rc4plus/rc4-tabu-attack/src")
 
 
 class RC4Visualizer:
@@ -61,6 +68,18 @@ class RC4Visualizer:
         self.button_panel = ButtonPanel(self.control_panel.frame, button_callbacks)
         self.button_panel.grid(row=4, column=0, columnspan=4, pady=10)
 
+        # --- BOTÓN DE ATAQUE TABÚ ---
+        self.tabu_button = tk.Button(
+            self.button_panel.frame,
+            text="Abrir Ataque Tabu",
+            command=self.open_tabu_window,
+            background="#d9534f",  # Rojo
+            foreground="white",
+            font=("Helvetica", 10, "bold"),
+        )
+        self.tabu_button.pack(side=tk.LEFT, padx=10)
+        # ----------------------------
+
         # Main content area
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -70,6 +89,8 @@ class RC4Visualizer:
 
         # Right side - Log and results
         self._setup_right_panel(main_frame)
+
+        # NOTA: Se ha eliminado el 'notebook' (pestañas) para que no salga abajo.
 
     def _setup_left_panel(self, parent):
         """Setup left panel with state visualization"""
@@ -353,6 +374,36 @@ class RC4Visualizer:
             self.log_manager.log("✗ Test FAILED: Recovered text does not match", "red")
 
         self.log_manager.log("--- RC4+ TEST END ---\n", "blue")
+
+    def open_tabu_window(self):
+        """Abre la interfaz del ataque Tabu en una nueva ventana Toplevel."""
+        # Comprobar si ya hay una ventana abierta
+        if hasattr(self, "tabu_window") and self.tabu_window.winfo_exists():
+            self.tabu_window.lift()
+            return
+
+        self.tabu_window = tk.Toplevel(self.root)
+        self.tabu_window.title("RC4+ Tabu Search State Recovery Attack")
+        self.tabu_window.geometry("1200x700")
+
+        # Instanciar el frame dentro de la nueva ventana
+        tabu_frame = TabuSearchFrame(self.tabu_window)
+        tabu_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Manejar el cierre de la ventana para detener el hilo del ataque
+        def on_close():
+            # Intentamos parar el ataque si está corriendo
+            # Probamos ambos nombres de métodos por seguridad según la versión de tabu_gui
+            if hasattr(tabu_frame, "_stop"):
+                tabu_frame._stop()
+            elif hasattr(tabu_frame, "_stop_attack"):
+                tabu_frame._stop_attack()
+            elif hasattr(tabu_frame, "cracker") and tabu_frame.cracker:
+                tabu_frame.cracker.stop()
+
+            self.tabu_window.destroy()
+
+        self.tabu_window.protocol("WM_DELETE_WINDOW", on_close)
 
 
 def main():
