@@ -33,6 +33,7 @@ class TabuAttackGUI(tk.Frame):
 
         # NEW: Memory tracking for orange cells
         self.memory_correct = set()  # Set of indices that were correct at some point
+        self.memory_correct_keystream = set()  # NEW: Memory for keystream bytes
 
         # UI update rate (ms)
         self.update_interval = 100
@@ -518,8 +519,10 @@ class TabuAttackGUI(tk.Frame):
                     fill="black",
                 )
 
-    def _draw_keystream_row(self, canvas, target_ks, actual_ks):
-        """NEW: Draw a single keystream comparison row"""
+    def _draw_keystream_row(
+        self, canvas, target_ks, actual_ks, use_colors=True, use_memory=False
+    ):
+        """MODIFIED: Draw a single keystream comparison row with optional coloring and memory"""
         canvas.delete("all")
 
         if target_ks is None or actual_ks is None:
@@ -541,10 +544,27 @@ class TabuAttackGUI(tk.Frame):
             x2 = x1 + cell_width
 
             # Determine color
-            if actual_ks[i] == target_ks[i]:
-                fill_color = "lightgreen"
+            if not use_colors:
+                # Current output: no colors
+                fill_color = "white"
+            elif use_memory:
+                # Best output: with memory system
+                is_currently_correct = actual_ks[i] == target_ks[i]
+                was_correct = i in self.memory_correct_keystream
+
+                if is_currently_correct:
+                    fill_color = "lightgreen"
+                    self.memory_correct_keystream.add(i)  # Add to memory
+                elif was_correct:
+                    fill_color = "orange"  # Was correct before
+                else:
+                    fill_color = "lightcoral"
             else:
-                fill_color = "lightcoral"
+                # Simple coloring (no memory)
+                if actual_ks[i] == target_ks[i]:
+                    fill_color = "lightgreen"
+                else:
+                    fill_color = "lightcoral"
 
             # Draw cell
             canvas.create_rectangle(x1, 2, x2, 23, fill=fill_color, outline="gray")
@@ -559,7 +579,7 @@ class TabuAttackGUI(tk.Frame):
             )
 
     def _draw_keystream_comparison(self, target_ks, current_ks, best_ks):
-        """NEW: Draw all three keystream rows"""
+        """MODIFIED: Draw all three keystream rows with different color schemes"""
         # Update target label
         display_length = min(20, len(target_ks))
         target_text = " ".join([f"{b:02X}" for b in target_ks[:display_length]])
@@ -567,9 +587,19 @@ class TabuAttackGUI(tk.Frame):
             target_text += "..."
         self.target_ks_label.config(text=target_text)
 
-        # Draw current and best keystreams
-        self._draw_keystream_row(self.current_ks_canvas, target_ks, current_ks)
-        self._draw_keystream_row(self.best_ks_canvas, target_ks, best_ks)
+        # Draw current keystream WITHOUT colors
+        self._draw_keystream_row(
+            self.current_ks_canvas,
+            target_ks,
+            current_ks,
+            use_colors=False,
+            use_memory=False,
+        )
+
+        # Draw best keystream WITH colors and memory
+        self._draw_keystream_row(
+            self.best_ks_canvas, target_ks, best_ks, use_colors=True, use_memory=True
+        )
 
     def _update_tabu_list(self, tabu_deque):
         """Update tabu list display"""
@@ -672,6 +702,7 @@ class TabuAttackGUI(tk.Frame):
         self.target_state = None
         self.target_keystream = None
         self.memory_correct.clear()
+        self.memory_correct_keystream.clear()  # NEW: Clear keystream memory
 
         # Clear queue
         while not self.update_queue.empty():
@@ -800,7 +831,7 @@ Imagina que estás escalando una montaña en la niebla, buscando la CIMA MÁS AL
    (óptimos locales) - piensan que llegaron arriba, pero no es la cima real.
 
 ✅ SOLUCIÓN TABÚ:
-   
+
    1. ACEPTA BAJAR TEMPORALMENTE
       → Si estás en una cima falsa (fitness 7/10), el algoritmo puede
          aceptar movimientos que EMPEORAN (bajar a 6/10) para escapar
