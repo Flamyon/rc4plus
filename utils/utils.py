@@ -18,7 +18,7 @@ Defina los parámetros para la simulación:
 - Max Iterations: Límite de intentos antes de detener el algoritmo.
 - Modo de Ataque:
   · ⚡ Rápido: El algoritmo corre a máxima velocidad sin pausas. La UI se actualiza cada 500ms, pero el backend procesa iteraciones mucho más rápido. Las visualizaciones pueden no reflejar todos los estados intermedios debido a la alta velocidad de procesamiento.
-  · Didáctico: El algoritmo pausa 100ms entre iteraciones para permitir una visualización fluida y educativa de cada paso del proceso.
+  · Didáctico: El algoritmo pausa 500ms entre iteraciones para permitir una visualización fluida y educativa de cada paso del proceso.
 
 2. Funcionamiento (Botón Start Attack)
 Al pulsar Start Attack, se desencadena la siguiente secuencia lógica:

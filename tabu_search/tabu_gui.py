@@ -714,7 +714,7 @@ class TabuAttackGUI(tk.Frame):
                 delay = 0
                 self.update_interval = 500  # Update UI less frequently in fast mode
             else:
-                delay = 0.1
+                delay = 0.5
                 self.update_interval = 100  # Update UI more frequently in didactic mode
 
             # Start attack in background
