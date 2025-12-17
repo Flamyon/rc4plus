@@ -331,6 +331,9 @@ class TabuCracker:
         with self.lock:
             logger.debug(f"Starting iteration {self.iteration + 1}")
 
+            # NUEVO: Guardar el estado ANTES de aplicar cualquier swap
+            previous_candidate = self.current_candidate.copy()
+
             swaps_to_check = self._get_random_swaps()
 
             best_neighbor = None
@@ -364,9 +367,10 @@ class TabuCracker:
                         best_move = move
 
             if best_neighbor is not None:
+                # Aplicar el swap al estado interno (NUEVO)
                 self.current_candidate = best_neighbor
                 self.current_fitness = best_neighbor_fitness
-                self.current_swap = best_move  # NEW: Store current swap
+                self.current_swap = best_move
 
                 # Update predicted keystream for visualization
                 self.current_predicted_keystream = self._generate_keystream(
@@ -380,7 +384,6 @@ class TabuCracker:
                     )
                     self.best_candidate = best_neighbor.copy()
                     self.best_fitness = best_neighbor_fitness
-                    # NEW: Update best predicted keystream
                     self.best_predicted_keystream = (
                         self.current_predicted_keystream.copy()
                     )
@@ -395,6 +398,7 @@ class TabuCracker:
                 f"best_fitness={self.best_fitness}"
             )
 
+            # MODIFICADO: Devolver el estado ANTERIOR para visualización
             return {
                 "iteration": self.iteration,
                 "current_fitness": self.current_fitness,
@@ -402,14 +406,15 @@ class TabuCracker:
                 "tabu_size": len(self.tabu_deque),
                 "move_accepted": best_move,
                 "best_candidate": self.best_candidate.copy(),
-                "current_candidate": self.current_candidate.copy(),
+                "current_candidate": self.current_candidate.copy(),  # Estado NUEVO (post-swap)
+                "display_candidate": previous_candidate,  # Estado VIEJO (pre-swap) para visualización
                 "target_state": (
                     self.target_state.copy() if self.target_state is not None else None
                 ),
                 "predicted_keystream": self.current_predicted_keystream.copy(),
-                "best_predicted_keystream": self.best_predicted_keystream.copy(),  # NEW
+                "best_predicted_keystream": self.best_predicted_keystream.copy(),
                 "target_keystream": self.target_keystream.copy(),
-                "current_swap": self.current_swap,  # NEW
+                "current_swap": self.current_swap,
             }
 
     def run(self, max_iterations=1000, callback=None):

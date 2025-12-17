@@ -351,7 +351,7 @@ class TabuAttackGUI(tk.Frame):
         self.tabu_listbox.config(yscrollcommand=scrollbar.set)
 
     def _create_keystream_zone(self, parent):
-        """NEW: Create Keystream comparison zone with 3 rows"""
+        """MODIFIED: Create Keystream comparison zone with 3 rows - ALL with Canvas"""
         keystream_frame = tk.LabelFrame(
             parent,
             text="Keystream Comparison",
@@ -360,7 +360,7 @@ class TabuAttackGUI(tk.Frame):
         )
         keystream_frame.grid(row=2, column=0, sticky="ew")
 
-        # Target keystream
+        # Target keystream - CHANGED to Canvas
         target_ks_frame = tk.Frame(keystream_frame, bg=self.bg_color)
         target_ks_frame.pack(fill="x", padx=5, pady=(5, 2))
 
@@ -373,15 +373,14 @@ class TabuAttackGUI(tk.Frame):
             anchor="w",
         ).pack(side="left")
 
-        self.target_ks_label = tk.Label(
+        self.target_ks_canvas = tk.Canvas(
             target_ks_frame,
-            text="",
-            font=("Courier", 9),
+            height=25,
             bg="white",
-            anchor="w",
-            relief="sunken",
+            highlightthickness=1,
+            highlightbackground="gray",
         )
-        self.target_ks_label.pack(side="left", fill="x", expand=True)
+        self.target_ks_canvas.pack(side="left", fill="x", expand=True)
 
         # Current keystream
         current_ks_frame = tk.Frame(keystream_frame, bg=self.bg_color)
@@ -405,7 +404,7 @@ class TabuAttackGUI(tk.Frame):
         )
         self.current_ks_canvas.pack(side="left", fill="x", expand=True)
 
-        # NEW: Best keystream
+        # Best keystream
         best_ks_frame = tk.Frame(keystream_frame, bg=self.bg_color)
         best_ks_frame.pack(fill="x", padx=5, pady=(2, 5))
 
@@ -579,13 +578,15 @@ class TabuAttackGUI(tk.Frame):
             )
 
     def _draw_keystream_comparison(self, target_ks, current_ks, best_ks):
-        """MODIFIED: Draw all three keystream rows with different color schemes"""
-        # Update target label
-        display_length = min(20, len(target_ks))
-        target_text = " ".join([f"{b:02X}" for b in target_ks[:display_length]])
-        if len(target_ks) > display_length:
-            target_text += "..."
-        self.target_ks_label.config(text=target_text)
+        """MODIFIED: Draw all three keystream rows - Target also with boxes"""
+        # Draw target keystream WITH boxes (no colors)
+        self._draw_keystream_row(
+            self.target_ks_canvas,
+            target_ks,
+            target_ks,  # Compare with itself to show all white
+            use_colors=False,
+            use_memory=False,
+        )
 
         # Draw current keystream WITHOUT colors
         self._draw_keystream_row(
@@ -702,7 +703,7 @@ class TabuAttackGUI(tk.Frame):
         self.target_state = None
         self.target_keystream = None
         self.memory_correct.clear()
-        self.memory_correct_keystream.clear()  # NEW: Clear keystream memory
+        self.memory_correct_keystream.clear()
 
         # Clear queue
         while not self.update_queue.empty():
@@ -718,12 +719,12 @@ class TabuAttackGUI(tk.Frame):
         self.tabu_size_label.config(text="Tabu Size: 0")
         self.success_label.config(text="")
 
-        # Clear visualizations
+        # Clear visualizations - MODIFIED to include target_ks_canvas
         self.target_canvas.delete("all")
         self.candidate_canvas.delete("all")
+        self.target_ks_canvas.delete("all")  # NEW
         self.current_ks_canvas.delete("all")
         self.best_ks_canvas.delete("all")
-        self.target_ks_label.config(text="")
         self.tabu_listbox.delete(0, tk.END)
 
         # Enable start button
@@ -762,9 +763,10 @@ class TabuAttackGUI(tk.Frame):
             self.tabu_size_label.config(text=f"Tabu Size: {stats['tabu_size']}")
 
             # Update S-Box visualizations
+            # MODIFIED: Use display_candidate (PRE-swap state) for visualization with yellow border
             self._draw_sbox(
                 self.candidate_canvas,
-                stats["current_candidate"],
+                stats.get("display_candidate", stats["current_candidate"]),  # Use display_candidate if available
                 target_sbox=stats["target_state"],
                 current_swap=stats.get("current_swap"),
             )
