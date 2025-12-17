@@ -16,6 +16,9 @@ Defina los parámetros para la simulación:
 - N Size: El tamaño de la S-Box (espacio de búsqueda).
 - Keystream Length: Cantidad de caracteres (bytes) que se generarán para evaluar las soluciones.
 - Max Iterations: Límite de intentos antes de detener el algoritmo.
+- Modo de Ataque:
+  · ⚡ Rápido: El algoritmo corre a máxima velocidad sin pausas. La UI se actualiza cada 500ms, pero el backend procesa iteraciones mucho más rápido. Las visualizaciones pueden no reflejar todos los estados intermedios debido a la alta velocidad de procesamiento.
+  · Didáctico: El algoritmo pausa 100ms entre iteraciones para permitir una visualización fluida y educativa de cada paso del proceso.
 
 2. Funcionamiento (Botón Start Attack)
 Al pulsar Start Attack, se desencadena la siguiente secuencia lógica:
@@ -53,4 +56,16 @@ Este panel muestra métricas numéricas en tiempo real:
 - Tabu Size: Cantidad de movimientos que están temporalmente prohibidos en la lista tabú.
 """
 
+    return texto
+
+def show_algorithm_info_text() -> str:
+    texto = """El proceso de recuperación de la clave se articula mediante una función de fitness, encargada de evaluar la calidad de cada solución candidata. Esta función actúa como un comparador que mide la discrepancia entre la keystream generada por la caja candidata y la keystream objetivo. El algoritmo identifica la solución correcta cuando esta discrepancia es nula, es decir, cuando la salida generada coincide exactamente con la esperada.
+
+Para alcanzar este estado, la Búsqueda Tabú emplea una estrategia dinámica diseñada para evitar el estancamiento en máximos locales. Siguiendo una analogía topológica, mientras que un algoritmo voraz (hill climbing) se detendría al alcanzar la cima de una colina pequeña (creyendo erróneamente que es el punto más alto), la Búsqueda Tabú posee la capacidad de aceptar movimientos hacia soluciones peores.
+
+Esto equivale a descender de la colina para atravesar un valle y poder ascender hacia una montaña más alta (el máximo global). Al permitir temporalmente una disminución en el valor de fitness y bloquear el retorno inmediato a estados anteriores mediante la lista tabú, el sistema garantiza una exploración profunda del espacio de búsqueda.
+
+Es fundamental notar que, debido a las características del cifrado analizado, existe una notable asimetría dimensional; Si se intenta reconstruir un estado interno (S-Box) de 64 bytes utilizando únicamente una referencia de salida de 5 bytes. Dada esta diferencia de entropía, existen múltiples configuraciones iniciales de la caja que pueden derivar en la misma salida final.
+
+Por tanto, es posible que el algoritmo converja y detenga su ejecución al encontrar una caja que genera la keystream correcta (maximizando la función de fitness), aunque dicha caja no sea idéntica bit a bit a la S-Box original, sino una solución matemáticamente equivalente para ese fragmento específico."""
     return texto

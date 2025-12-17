@@ -4,7 +4,7 @@ import queue
 import math
 import logging
 from tabu_search.tabu_logic import generate_rc4_plus_keystream, TabuCracker
-from utils.utils import show_help_text
+from utils.utils import show_algorithm_info_text, show_help_text
 
 # Configure logging
 logging.basicConfig(
@@ -32,11 +32,11 @@ class TabuAttackGUI(tk.Frame):
         self.update_queue = queue.Queue()
         self.is_running = False
 
-        # NEW: Memory tracking for orange cells
+        # Memory tracking for orange cells
         self.memory_correct = set()  # Set of indices that were correct at some point
-        self.memory_correct_keystream = set()  # NEW: Memory for keystream bytes
+        self.memory_correct_keystream = set()  #  Memory for keystream bytes
 
-        # UI update rate (ms)
+        # UI update rate (ms) - will be set dynamically based on attack mode
         self.update_interval = 100
 
         # Build the interface
@@ -76,7 +76,7 @@ class TabuAttackGUI(tk.Frame):
         )
         title.pack(side="left")
 
-        # NEW: Help button
+        # Help button
         help_button = tk.Button(
             title_frame,
             text="?",
@@ -88,7 +88,20 @@ class TabuAttackGUI(tk.Frame):
             height=1,
             cursor="hand2",
         )
-        help_button.pack(side="right")
+        help_button.pack(side="right", padx=(5, 0))
+
+        info_button = tk.Button(
+            title_frame,
+            text="i",
+            command=self._show_algorithm_info,
+            bg="#9C27B0",
+            fg="white",
+            font=("Arial", 12, "bold"),
+            width=2,
+            height=1,
+            cursor="hand2",
+        )
+        info_button.pack(side="right")
 
         # Configuration section
         config_frame = tk.LabelFrame(
@@ -131,7 +144,33 @@ class TabuAttackGUI(tk.Frame):
         iterations_entry = tk.Entry(
             config_frame, textvariable=self.max_iterations_var, width=18
         )
-        iterations_entry.pack(padx=5, pady=(0, 10))
+        iterations_entry.pack(padx=5, pady=(0, 5))
+
+        # Attack Mode
+        tk.Label(config_frame, text="Modo de Ataque:", bg=self.bg_color).pack(
+            anchor="w", padx=5, pady=(5, 0)
+        )
+        self.attack_mode_var = tk.StringVar(value="didactico")
+        mode_frame = tk.Frame(config_frame, bg=self.bg_color)
+        mode_frame.pack(padx=5, pady=(0, 10))
+        
+        tk.Radiobutton(
+            mode_frame,
+            text="⚡ Rápido",
+            variable=self.attack_mode_var,
+            value="rapido",
+            bg=self.bg_color,
+            font=("Arial", 9)
+        ).pack(anchor="w")
+        
+        tk.Radiobutton(
+            mode_frame,
+            text="Didáctico",
+            variable=self.attack_mode_var,
+            value="didactico",
+            bg=self.bg_color,
+            font=("Arial", 9)
+        ).pack(anchor="w")
 
         # Control buttons
         self.start_button = tk.Button(
@@ -159,7 +198,7 @@ class TabuAttackGUI(tk.Frame):
         )
         self.stop_button.pack(fill="x", pady=(0, 10))
 
-        # NEW: Reset button
+        # Reset button
         self.reset_button = tk.Button(
             left_frame,
             text="Reiniciar",
@@ -201,7 +240,7 @@ class TabuAttackGUI(tk.Frame):
         )
         self.tabu_size_label.pack(anchor="w", padx=5, pady=(2, 5))
 
-        # NEW: Success message label
+        # Success message label
         self.success_label = tk.Label(
             left_frame,
             text="",
@@ -240,7 +279,7 @@ class TabuAttackGUI(tk.Frame):
         # Configure grid for two canvases side by side
         sbox_frame.grid_rowconfigure(0, weight=0)  # Title row
         sbox_frame.grid_rowconfigure(1, weight=1)  # Canvas row
-        sbox_frame.grid_rowconfigure(2, weight=0)  # NEW: Legend row
+        sbox_frame.grid_rowconfigure(2, weight=0)  # Legend row
         sbox_frame.grid_columnconfigure(0, weight=1)
         sbox_frame.grid_columnconfigure(1, weight=1)
 
@@ -272,11 +311,11 @@ class TabuAttackGUI(tk.Frame):
         )
         self.candidate_canvas.grid(row=1, column=1, sticky="nsew", padx=(5, 0))
 
-        # NEW: Color Legend
+        #Color Legend
         self._create_color_legend(sbox_frame)
 
     def _create_color_legend(self, parent):
-        """NEW: Create color legend for S-Box visualization"""
+        """ Create color legend for S-Box visualization"""
         legend_frame = tk.Frame(parent, bg=self.bg_color)
         legend_frame.grid(row=2, column=0, columnspan=2, pady=(5, 0))
 
@@ -610,7 +649,10 @@ class TabuAttackGUI(tk.Frame):
         if tabu_deque is None or len(tabu_deque) == 0:
             return
 
-        for move in tabu_deque:
+        # Create a snapshot of the deque to avoid mutation during iteration
+        tabu_snapshot = list(tabu_deque)
+        
+        for move in tabu_snapshot:
             move_text = f"Swap({move[0]:3d}, {move[1]:3d})"
             self.tabu_listbox.insert(tk.END, move_text)
 
@@ -627,7 +669,7 @@ class TabuAttackGUI(tk.Frame):
 
             # Validate parameters
             if keystream_length < 1 or keystream_length > 256:
-                # NEW: Show error in GUI instead of messagebox
+                #Show error in GUI instead of messagebox
                 self.success_label.config(
                     text="ERROR: La longitud del keystream debe estar entre 1 y 256", fg="red"
                 )
@@ -666,20 +708,28 @@ class TabuAttackGUI(tk.Frame):
             self.stop_button.config(state="normal")
             self.n_size_var.set(str(N))  # Lock value
 
+            # Determine delay and UI update interval based on attack mode
+            attack_mode = self.attack_mode_var.get()
+            if attack_mode == "rapido":
+                delay = 0
+                self.update_interval = 500  # Update UI less frequently in fast mode
+            else:
+                delay = 0.1
+                self.update_interval = 100  # Update UI more frequently in didactic mode
+
             # Start attack in background
             def callback(stats):
                 self.update_queue.put(stats)
-
-            # MODIFIED: Use delay=0.05 for smooth visualization
+            
             self.cracker.run(
-                max_iterations=max_iterations, callback=callback, delay=0.05
+                max_iterations=max_iterations, callback=callback, delay=delay
             )
 
             logger.info("Attack started successfully")
 
         except Exception as e:
             logger.error(f"Failed to start attack: {e}", exc_info=True)
-            # NEW: Show error in GUI
+            #Show error in GUI
             self.success_label.config(text=f"ERROR: {str(e)}", fg="red")
             self._stop_attack()
 
@@ -697,7 +747,7 @@ class TabuAttackGUI(tk.Frame):
         logger.info("Attack stopped")
 
     def _reset_attack(self):
-        """NEW: Reset the attack to initial state"""
+        """: Reset the attack to initial state"""
         logger.info("Resetting attack")
 
         # Stop if running
@@ -728,7 +778,7 @@ class TabuAttackGUI(tk.Frame):
         # Clear visualizations - MODIFIED to include target_ks_canvas
         self.target_canvas.delete("all")
         self.candidate_canvas.delete("all")
-        self.target_ks_canvas.delete("all")  # NEW
+        self.target_ks_canvas.delete("all")
         self.current_ks_canvas.delete("all")
         self.best_ks_canvas.delete("all")
         self.tabu_listbox.delete(0, tk.END)
@@ -793,7 +843,7 @@ class TabuAttackGUI(tk.Frame):
             # Check for completion
             if stats["best_fitness"] == keystream_length:
                 self._stop_attack()
-                # NEW: Show success in GUI instead of messagebox
+                #Show success in GUI instead of messagebox
                 self.success_label.config(
                     text=f"¡ÉXITO! SOLUCIÓN ENCONTRADA\nEn {stats['iteration']} iteraciones",
                     fg="green",
@@ -804,7 +854,7 @@ class TabuAttackGUI(tk.Frame):
             logger.error(f"Error updating UI: {e}", exc_info=True)
 
     def _show_help(self):
-        """NEW: Show help window with mountain metaphor"""
+        """Show help window with mountain metaphor"""
         help_window = tk.Toplevel(self.parent)
         help_window.title("Ayuda - Búsqueda Tabú")
         help_window.geometry("700x600")
@@ -908,6 +958,76 @@ class TabuAttackGUI(tk.Frame):
             text="Cerrar",
             command=help_window.destroy,
             bg="#2196F3",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            cursor="hand2",
+            padx=20,
+            pady=5,
+        )
+        close_button.pack(pady=(0, 20))
+
+    def _show_algorithm_info(self):
+        """Show algorithm mechanism and convergence information"""
+        info_window = tk.Toplevel(self.parent)
+        info_window.title("Mecanismo del Algoritmo")
+        info_window.geometry("750x650")
+        info_window.configure(bg=self.bg_color)
+
+        # Make it modal
+        info_window.transient(self.parent)
+        info_window.grab_set()
+
+        # Title
+        title = tk.Label(
+            info_window,
+            text="Mecanismo de Búsqueda y Convergencia",
+            font=("Arial", 16, "bold"),
+            bg=self.bg_color,
+        )
+        title.pack(pady=(20, 10))
+
+        # Main text frame with scrollbar
+        text_frame = tk.Frame(info_window, bg="white", relief="sunken", borderwidth=1)
+        text_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
+
+        # Text widget
+        info_text = tk.Text(
+            text_frame,
+            wrap="word",
+            bg="white",
+            font=("Arial", 11),
+            padx=15,
+            pady=15,
+            borderwidth=0,
+            highlightthickness=0,
+        )
+        info_text.grid(row=0, column=0, sticky="nsew")
+
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(text_frame, command=info_text.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        info_text.config(yscrollcommand=scrollbar.set)
+
+        # Define text styles
+        info_text.tag_configure("title", font=("Arial", 12, "bold"), spacing3=10)
+        info_text.tag_configure("bold", font=("Arial", 11, "bold"))
+        info_text.tag_configure("italic", font=("Arial", 11, "italic"))
+
+        # Insert content
+        content = show_algorithm_info_text()
+        info_text.insert(tk.END, content)
+
+        # Disable editing
+        info_text.config(state="disabled")
+
+        # Close button
+        close_button = tk.Button(
+            info_window,
+            text="Cerrar",
+            command=info_window.destroy,
+            bg="#9C27B0",
             fg="white",
             font=("Arial", 11, "bold"),
             cursor="hand2",
