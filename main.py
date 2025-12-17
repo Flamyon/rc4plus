@@ -12,17 +12,13 @@ Arquitectura modular:
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 import time
-import sys
 
 # Importamos la ventana del ataque
-from tabu_gui import TabuAttackGUI
+from tabu_search.tabu_gui import TabuAttackGUI
 
-from rc4_crypto import RC4Classic, RC4Plus
-from rc4_visualization import StateVisualizer, LogManager
-from rc4_ui import ControlPanel, ButtonPanel, ResultPanel, StateVariablesPanel
-
-# Ajusta esta ruta si es necesario, o bórrala si los archivos están en la misma carpeta
-sys.path.append("/home/mregidorgarcia/proyectos/rc4plus/rc4-tabu-attack/src")
+from rc4.rc4_crypto import RC4Classic, RC4Plus
+from rc4.rc4_visualization import StateVisualizer, LogManager
+from rc4.rc4_ui import ControlPanel, ButtonPanel, ResultPanel, StateVariablesPanel
 
 
 class RC4Visualizer:

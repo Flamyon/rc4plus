@@ -3,7 +3,8 @@ from tkinter import ttk
 import queue
 import math
 import logging
-from tabu_logic import generate_rc4_plus_keystream, TabuCracker
+from tabu_search.tabu_logic import generate_rc4_plus_keystream, TabuCracker
+from utils.utils import show_help_text
 
 # Configure logging
 logging.basicConfig(
@@ -670,7 +671,9 @@ class TabuAttackGUI(tk.Frame):
                 self.update_queue.put(stats)
 
             # MODIFIED: Use delay=0.05 for smooth visualization
-            self.cracker.run(max_iterations=max_iterations, callback=callback, delay=0.05)
+            self.cracker.run(
+                max_iterations=max_iterations, callback=callback, delay=0.05
+            )
 
             logger.info("Attack started successfully")
 
@@ -689,6 +692,7 @@ class TabuAttackGUI(tk.Frame):
 
         self.start_button.config(state="normal")
         self.stop_button.config(state="disabled")
+        self.success_label.config(text="Attack stopped", fg="red")
 
         logger.info("Attack stopped")
 
@@ -768,7 +772,9 @@ class TabuAttackGUI(tk.Frame):
             # MODIFIED: Use display_candidate (PRE-swap state) for visualization with yellow border
             self._draw_sbox(
                 self.candidate_canvas,
-                stats.get("display_candidate", stats["current_candidate"]),  # Use display_candidate if available
+                stats.get(
+                    "display_candidate", stats["current_candidate"]
+                ),  # Use display_candidate if available
                 target_sbox=stats["target_state"],
                 current_swap=stats.get("current_swap"),
             )
@@ -801,7 +807,7 @@ class TabuAttackGUI(tk.Frame):
         """NEW: Show help window with mountain metaphor"""
         help_window = tk.Toplevel(self.parent)
         help_window.title("Ayuda - Búsqueda Tabú")
-        help_window.geometry("600x500")
+        help_window.geometry("700x600")
         help_window.configure(bg=self.bg_color)
 
         # Make it modal
@@ -811,68 +817,90 @@ class TabuAttackGUI(tk.Frame):
         # Title
         title = tk.Label(
             help_window,
-            text="¿Cómo funciona la Búsqueda Tabú?",
+            text="Guía de la Herramienta",
             font=("Arial", 16, "bold"),
             bg=self.bg_color,
         )
         title.pack(pady=(20, 10))
 
-        # Main text frame
-        text_frame = tk.Frame(help_window, bg="white", relief="sunken", borderwidth=2)
+        # Main text frame with scrollbar
+        text_frame = tk.Frame(help_window, bg="white", relief="sunken", borderwidth=1)
         text_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
 
-        # Content
-        help_text = """
-🏔️ LA METÁFORA DE LA MONTAÑA
-
-Imagina que estás escalando una montaña en la niebla, buscando la CIMA MÁS ALTA (fitness perfecto: 10/10).
-
-🎯 OBJETIVO:
-   Encontrar el estado interno correcto del cifrado RC4+.
-
-❌ PROBLEMA:
-   Los algoritmos tradicionales se quedan atascados en "CIMAS FALSAS"
-   (óptimos locales) - piensan que llegaron arriba, pero no es la cima real.
-
-✅ SOLUCIÓN TABÚ:
-
-   1. ACEPTA BAJAR TEMPORALMENTE
-      → Si estás en una cima falsa (fitness 7/10), el algoritmo puede
-         aceptar movimientos que EMPEORAN (bajar a 6/10) para escapar
-         del atasco.
-
-   2. MEMORIA (LISTA TABÚ)
-      → Recuerda los últimos movimientos realizados para no volver
-         atrás inmediatamente (evita dar vueltas en círculo).
-
-   3. EXPLORACIÓN INTELIGENTE
-      → Puede bajar de la cima falsa, explorar el valle, y encontrar
-         el camino hacia la CIMA REAL.
-
-🎨 COLORES EN LA VISUALIZACIÓN:
-
-   🟢 Verde: Celda correcta AHORA
-   🟠 Naranja: Fue correcta antes (memoria visual)
-   🔴 Rojo: Nunca ha sido correcta
-   🟡 Borde Dorado: Intercambio actual en progreso
-
-💡 RESUMEN:
-   La clave está en ACEPTAR EMPEORAR temporalmente para encontrar
-   mejores soluciones a largo plazo. ¡Como bajar un poco para poder
-   escalar más alto!
-        """
-
-        help_label = tk.Label(
+        # Text widget for formatted content
+        help_text_widget = tk.Text(
             text_frame,
-            text=help_text,
-            font=("Courier", 10),
+            wrap="word",
             bg="white",
-            justify="left",
-            anchor="nw",
+            font=("Arial", 11),
             padx=15,
             pady=15,
+            borderwidth=0,
+            highlightthickness=0,
         )
-        help_label.pack(fill="both", expand=True)
+        help_text_widget.grid(row=0, column=0, sticky="nsew")
+
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(text_frame, command=help_text_widget.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        help_text_widget.config(yscrollcommand=scrollbar.set)
+
+        # Define text styles (tags)
+        help_text_widget.tag_configure("h1", font=("Arial", 12, "bold"), spacing3=10)
+        help_text_widget.tag_configure("h2", font=("Arial", 11, "bold"), spacing3=5)
+        help_text_widget.tag_configure("bold", font=("Arial", 11, "bold"))
+        help_text_widget.tag_configure("bullet", lmargin1=20, lmargin2=20)
+        help_text_widget.tag_configure(
+            "code", font=("Courier", 10), background="#f0f0f0"
+        )
+        help_text_widget.tag_configure("success", foreground="green")
+        help_text_widget.tag_configure("error", foreground="red")
+        help_text_widget.tag_configure("antes_success", foreground="orange")
+        help_text_widget.tag_configure("info", foreground="blue")
+        # Get and insert formatted text
+        help_text = show_help_text()
+        for line in help_text.split("\n"):
+            if line.startswith("Ayuda:"):
+                help_text_widget.insert(tk.END, line + "\n\n", "h1")
+            elif line and line[0].isdigit() and "." in line:
+                help_text_widget.insert(tk.END, line + "\n", "h2")
+            elif line.strip().startswith("-"):
+                clean_line = line.strip()[1:].strip()
+                parts = clean_line.split(":", 1)
+
+                if len(parts) == 2:
+                    help_text_widget.insert(tk.END, "• ", "bullet")
+
+                    # Lógica para elegir el icono y color según el texto
+                    key_text = parts[0]
+                    icon = ""
+                    style = ("bullet", "bold")  # Estilo por defecto
+
+                    if "Incorrecto" in key_text:
+                        icon = "✖ "
+                        style = ("bullet", "bold", "error")
+                    elif "Fue Correcto" in key_text:
+                        icon = "⚠️ "
+                        style = ("bullet", "bold", "antes_success")
+                    elif "Correcto" in key_text:
+                        icon = "✔ "
+                        style = ("bullet", "bold", "success")
+                    elif "Intercambio" in key_text:
+                        icon = "⇄ "
+                        style = ("bullet", "bold", "info")
+
+                    # Insertar con el icono y color seleccionado
+                    help_text_widget.insert(tk.END, f"{icon}{key_text}:", style)
+                    help_text_widget.insert(tk.END, f"{parts[1]}\n", "bullet")
+                else:
+                    help_text_widget.insert(tk.END, f"• {clean_line}\n", "bullet")
+            else:
+                help_text_widget.insert(tk.END, line + "\n")
+
+        # Disable editing
+        help_text_widget.config(state="disabled")
 
         # Close button
         close_button = tk.Button(

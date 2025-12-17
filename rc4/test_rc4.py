@@ -4,7 +4,7 @@ Script de prueba rápida para verificar el funcionamiento del visualizador RC4/R
 """
 
 import sys
-from rc4_crypto import RC4Classic, RC4Plus, encrypt_decrypt
+from rc4.rc4_crypto import RC4Classic, RC4Plus, encrypt_decrypt
 
 
 def test_rc4_classic():
