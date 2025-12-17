@@ -115,9 +115,52 @@ class RC4Visualizer:
         # Initialize visualizer
         self.state_visualizer = StateVisualizer(self.state_canvas)
 
+        # Color legend
+        self._create_color_legend(left_frame)
+
         # State variables display
         self.state_vars_panel = StateVariablesPanel(left_frame)
         self.state_vars_panel.pack(fill=tk.X, pady=5)
+
+    def _create_color_legend(self, parent):
+        """Create color legend explaining the S-Box highlighting"""
+        legend_frame = ttk.LabelFrame(parent, text="Leyenda de Colores", padding=5)
+        legend_frame.pack(fill=tk.X, pady=5)
+
+        # Create a frame for the legend items
+        items_frame = ttk.Frame(legend_frame)
+        items_frame.pack(fill=tk.X)
+
+        # i - Blue
+        self._add_legend_item(items_frame, "lightblue", "blue", 
+                             "i: Índice incremental (i+1)", 0)
+
+        # j - Red
+        self._add_legend_item(items_frame, "lightcoral", "red", 
+                             "j: Índice calculado (j+S[i])", 1)
+
+        # t - Yellow (RC4 classic)
+        self._add_legend_item(items_frame, "lightyellow", "orange", 
+                             "t: Salida (S[i]+S[j]) - RC4", 2)
+
+        # t_prime - Green (RC4+ only)
+        self._add_legend_item(items_frame, "lightgreen", "green", 
+                             "t': Índice extra - RC4+", 3)
+
+        # t_double - Pink (RC4+ only)
+        self._add_legend_item(items_frame, "lightpink", "magenta", 
+                             "t'': Índice doble - RC4+", 4)
+
+    def _add_legend_item(self, parent, fill_color, border_color, text, row):
+        """Add a single legend item with color box and description"""
+        # Color box
+        canvas = tk.Canvas(parent, width=20, height=20, bg=fill_color,
+                          highlightthickness=2, highlightbackground=border_color)
+        canvas.grid(row=row, column=0, padx=(5, 5), pady=2, sticky=tk.W)
+
+        # Description text
+        label = ttk.Label(parent, text=text, font=("Arial", 9))
+        label.grid(row=row, column=1, padx=(0, 5), pady=2, sticky=tk.W)
 
     def _setup_right_panel(self, parent):
         """Setup right panel with log and results"""
@@ -374,7 +417,7 @@ class RC4Visualizer:
     def open_tabu_window(self):
         """Open Tabu Search attack window"""
         tabu_window = tk.Toplevel(self.root)
-        tabu_window.title("Tabu Search State Recovery Attack")
+        tabu_window.title("Ataque de Recuperación de Estado - Tabu Search")
         tabu_window.geometry("1400x900")
 
         # Create TabuAttackGUI instance - it IS a Frame itself

@@ -242,26 +242,28 @@ class LogManager:
 
     def _log_rc4_step(self, result):
         """Log RC4 classic step details"""
-        self.log(f"i = (i + 1) mod 256 = {result['i']}")
-        self.log(f"j = (j + S[i]) mod 256 = {result['j']}")
+        N = result.get('N', 256)
+        self.log(f"i = (i + 1) mod {N} = {result['i']}")
+        self.log(f"j = (j + S[i]) mod {N} = {result['j']}")
         self.log(f"Swap: {result['details']['swap']}")
-        self.log(f"t = (S[i] + S[j]) mod 256 = {result['t']}")
+        self.log(f"t = (S[i] + S[j]) mod {N} = {result['t']}")
         self.log(f"Output = S[t] = S[{result['t']}] = {result['output_byte']}")
 
     def _log_rc4plus_step(self, result):
         """Log RC4+ step details"""
-        self.log(f"i (after) = (i + 1) mod 256 = {result['i']}")
-        self.log(f"j (after) = (j + S[i]) mod 256 = {result['j']}")
+        N = result.get('N', 256)
+        self.log(f"i (after) = (i + 1) mod {N} = {result['i']}")
+        self.log(f"j (after) = (j + S[i]) mod {N} = {result['j']}")
         self.log(f"Swap: {result['details']['swap']}")
-        self.log(f"t = (S[i] + S[j]) mod 256 = {result['t']}")
+        self.log(f"t = (S[i] + S[j]) mod {N} = {result['t']}")
         self.log(f"idx1 = ((i>>3) XOR (j<<5)) & 0xFF = {result['idx1']}")
         self.log(f"idx2 = ((i<<5) XOR (j>>3)) & 0xFF = {result['idx2']}")
         self.log(
-            f"t_prime = (S[idx1] + S[idx2]) mod 256 XOR 0xAA = {result['t_prime']}"
+            f"t_prime = (S[idx1] + S[idx2]) mod {N} XOR 0xAA = {result['t_prime']}"
         )
-        self.log(f"t_double = (j + S[j]) mod 256 = {result['t_double']}")
+        self.log(f"t_double = (j + S[j]) mod {N} = {result['t_double']}")
         self.log(
-            f"Output = ((S[t] + S[t_prime]) mod 256) XOR S[t_double] = {result['output_byte']}"
+            f"Output = ((S[t] + S[t_prime]) mod {N}) XOR S[t_double] = {result['output_byte']}"
         )
 
     def log_prga_complete(self):

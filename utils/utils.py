@@ -4,6 +4,10 @@ Esta herramienta visualiza cómo el algoritmo intenta recuperar una S-Box secret
 
 Nota: Internamente, el algoritmo de búsqueda tabú está configurado utilizando la configuración Z2.
 
+Para una prueba rápida, visible y didáctica de la funcionalidad, utilice los siguientes parámetros predeterminados:
+    - Tamaño del Estado (N): 64
+    - Longitud de Keystream: 15 bytes"
+
 A continuación se detalla el funcionamiento de la interfaz:
 
 1. Configuración del Ataque

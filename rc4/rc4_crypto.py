@@ -83,6 +83,7 @@ class RC4Classic(RC4Engine):
             "i": self.i,
             "j": self.j,
             "t": t,
+            "N": self.N,
             "details": {
                 "algorithm": "RC4",
                 "swap": f"S[{self.i}] ↔ S[{self.j}]",
@@ -138,6 +139,7 @@ class RC4Plus(RC4Engine):
             "t_double": t_double,
             "idx1": idx1,
             "idx2": idx2,
+            "N": self.N,
             "details": {
                 "algorithm": "RC4+",
                 "swap": f"S[{self.i}] ↔ S[{self.j}]",

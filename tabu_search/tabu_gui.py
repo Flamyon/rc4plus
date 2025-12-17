@@ -70,7 +70,7 @@ class TabuAttackGUI(tk.Frame):
 
         title = tk.Label(
             title_frame,
-            text="Tabu Search Attack",
+            text="Ataque Tabu Search",
             font=("Arial", 14, "bold"),
             bg=self.bg_color,
         )
@@ -93,14 +93,14 @@ class TabuAttackGUI(tk.Frame):
         # Configuration section
         config_frame = tk.LabelFrame(
             left_frame,
-            text="Configuration",
+            text="Configuración",
             bg=self.bg_color,
             font=("Arial", 10, "bold"),
         )
         config_frame.pack(fill="x", pady=(0, 10))
 
         # N Size
-        tk.Label(config_frame, text="N Size:", bg=self.bg_color).pack(
+        tk.Label(config_frame, text="Tamaño N:", bg=self.bg_color).pack(
             anchor="w", padx=5, pady=(5, 0)
         )
         self.n_size_var = tk.StringVar(value="256")
@@ -114,7 +114,7 @@ class TabuAttackGUI(tk.Frame):
         n_combo.pack(padx=5, pady=(0, 5))
 
         # Keystream Length
-        tk.Label(config_frame, text="Keystream Length:", bg=self.bg_color).pack(
+        tk.Label(config_frame, text="Longitud Keystream:", bg=self.bg_color).pack(
             anchor="w", padx=5
         )
         self.keystream_length_var = tk.StringVar(value="32")
@@ -124,7 +124,7 @@ class TabuAttackGUI(tk.Frame):
         keystream_entry.pack(padx=5, pady=(0, 5))
 
         # Max Iterations
-        tk.Label(config_frame, text="Max Iterations:", bg=self.bg_color).pack(
+        tk.Label(config_frame, text="Máx. Iteraciones:", bg=self.bg_color).pack(
             anchor="w", padx=5
         )
         self.max_iterations_var = tk.StringVar(value="10000")
@@ -136,7 +136,7 @@ class TabuAttackGUI(tk.Frame):
         # Control buttons
         self.start_button = tk.Button(
             left_frame,
-            text="Start Attack",
+            text="Iniciar Ataque",
             command=self._start_attack,
             bg="#4CAF50",
             fg="white",
@@ -148,7 +148,7 @@ class TabuAttackGUI(tk.Frame):
 
         self.stop_button = tk.Button(
             left_frame,
-            text="Stop",
+            text="Detener",
             command=self._stop_attack,
             bg="#f44336",
             fg="white",
@@ -162,7 +162,7 @@ class TabuAttackGUI(tk.Frame):
         # NEW: Reset button
         self.reset_button = tk.Button(
             left_frame,
-            text="Reset",
+            text="Reiniciar",
             command=self._reset_attack,
             bg="#FF9800",
             fg="white",
@@ -174,12 +174,12 @@ class TabuAttackGUI(tk.Frame):
 
         # Status section
         status_frame = tk.LabelFrame(
-            left_frame, text="Status", bg=self.bg_color, font=("Arial", 10, "bold")
+            left_frame, text="Estado", bg=self.bg_color, font=("Arial", 10, "bold")
         )
         status_frame.pack(fill="x", pady=(0, 10))
 
         self.iteration_label = tk.Label(
-            status_frame, text="Iteration: 0", bg=self.bg_color, font=("Arial", 10)
+            status_frame, text="Iteración: 0", bg=self.bg_color, font=("Arial", 10)
         )
         self.iteration_label.pack(anchor="w", padx=5, pady=2)
 
@@ -190,14 +190,14 @@ class TabuAttackGUI(tk.Frame):
 
         self.best_fitness_label = tk.Label(
             status_frame,
-            text="Best Fitness: 0/0",
+            text="Mejor Fitness: 0/0",
             bg=self.bg_color,
             font=("Arial", 10),
         )
         self.best_fitness_label.pack(anchor="w", padx=5, pady=2)
 
         self.tabu_size_label = tk.Label(
-            status_frame, text="Tabu Size: 0", bg=self.bg_color, font=("Arial", 10)
+            status_frame, text="Tamaño Tabu: 0", bg=self.bg_color, font=("Arial", 10)
         )
         self.tabu_size_label.pack(anchor="w", padx=5, pady=(2, 5))
 
@@ -247,7 +247,7 @@ class TabuAttackGUI(tk.Frame):
         # Target S-Box (Left)
         target_label = tk.Label(
             sbox_frame,
-            text="Target S-Box (Objetivo Secreto)",
+            text="S-Box Objetivo (Secreto)",
             font=("Arial", 11, "bold"),
             bg=self.bg_color,
         )
@@ -261,7 +261,7 @@ class TabuAttackGUI(tk.Frame):
         # Candidate S-Box (Right)
         candidate_label = tk.Label(
             sbox_frame,
-            text="Candidate S-Box (Algoritmo)",
+            text="S-Box Candidato (Algoritmo)",
             font=("Arial", 11, "bold"),
             bg=self.bg_color,
         )
@@ -355,7 +355,7 @@ class TabuAttackGUI(tk.Frame):
         """MODIFIED: Create Keystream comparison zone with 3 rows - ALL with Canvas"""
         keystream_frame = tk.LabelFrame(
             parent,
-            text="Keystream Comparison",
+            text="Comparación de Keystream",
             bg=self.bg_color,
             font=("Arial", 10, "bold"),
         )
@@ -367,7 +367,7 @@ class TabuAttackGUI(tk.Frame):
 
         tk.Label(
             target_ks_frame,
-            text="Target Output:",
+            text="Salida Objetivo:",
             font=("Arial", 9, "bold"),
             bg=self.bg_color,
             width=15,
@@ -389,7 +389,7 @@ class TabuAttackGUI(tk.Frame):
 
         tk.Label(
             current_ks_frame,
-            text="Current Output:",
+            text="Salida Actual:",
             font=("Arial", 9, "bold"),
             bg=self.bg_color,
             width=15,
@@ -411,7 +411,7 @@ class TabuAttackGUI(tk.Frame):
 
         tk.Label(
             best_ks_frame,
-            text="Best Output:",
+            text="Mejor Salida:",
             font=("Arial", 9, "bold"),
             bg=self.bg_color,
             width=15,
@@ -629,12 +629,12 @@ class TabuAttackGUI(tk.Frame):
             if keystream_length < 1 or keystream_length > 256:
                 # NEW: Show error in GUI instead of messagebox
                 self.success_label.config(
-                    text="ERROR: Keystream length must be between 1 and 256", fg="red"
+                    text="ERROR: La longitud del keystream debe estar entre 1 y 256", fg="red"
                 )
                 return
             if max_iterations < 1:
                 self.success_label.config(
-                    text="ERROR: Max iterations must be positive", fg="red"
+                    text="ERROR: Las iteraciones máximas deben ser positivas", fg="red"
                 )
                 return
 
@@ -645,7 +645,7 @@ class TabuAttackGUI(tk.Frame):
             # Clear previous state
             self.memory_correct.clear()
             self.memory_correct_keystream.clear()
-            self.success_label.config(text="Searching...", fg="blue")
+            self.success_label.config(text="Buscando...", fg="blue")
 
             # Generate challenge
             self.target_state, self.target_keystream = generate_rc4_plus_keystream(
@@ -692,7 +692,7 @@ class TabuAttackGUI(tk.Frame):
 
         self.start_button.config(state="normal")
         self.stop_button.config(state="disabled")
-        self.success_label.config(text="Attack stopped", fg="red")
+        self.success_label.config(text="Ataque detenido", fg="red")
 
         logger.info("Attack stopped")
 
@@ -719,10 +719,10 @@ class TabuAttackGUI(tk.Frame):
                 break
 
         # Reset UI elements
-        self.iteration_label.config(text="Iteration: 0")
+        self.iteration_label.config(text="Iteración: 0")
         self.fitness_label.config(text="Fitness: 0/0")
-        self.best_fitness_label.config(text="Best Fitness: 0/0")
-        self.tabu_size_label.config(text="Tabu Size: 0")
+        self.best_fitness_label.config(text="Mejor Fitness: 0/0")
+        self.tabu_size_label.config(text="Tamaño Tabu: 0")
         self.success_label.config(text="")
 
         # Clear visualizations - MODIFIED to include target_ks_canvas
@@ -757,16 +757,16 @@ class TabuAttackGUI(tk.Frame):
         """Update UI with current statistics"""
         try:
             # Update status labels
-            self.iteration_label.config(text=f"Iteration: {stats['iteration']}")
+            self.iteration_label.config(text=f"Iteración: {stats['iteration']}")
 
             keystream_length = len(stats["target_keystream"])
             self.fitness_label.config(
                 text=f"Fitness: {stats['current_fitness']}/{keystream_length}"
             )
             self.best_fitness_label.config(
-                text=f"Best Fitness: {stats['best_fitness']}/{keystream_length}"
+                text=f"Mejor Fitness: {stats['best_fitness']}/{keystream_length}"
             )
-            self.tabu_size_label.config(text=f"Tabu Size: {stats['tabu_size']}")
+            self.tabu_size_label.config(text=f"Tamaño Tabu: {stats['tabu_size']}")
 
             # Update S-Box visualizations
             # MODIFIED: Use display_candidate (PRE-swap state) for visualization with yellow border
@@ -920,7 +920,7 @@ class TabuAttackGUI(tk.Frame):
 def main():
     """Main entry point"""
     root = tk.Tk()
-    root.title("RC4+ Tabu Search Attack - Educational Tool")
+    root.title("Ataque Tabu Search RC4+ - Herramienta Educativa")
     root.geometry("1400x900")
 
     # Create main frame

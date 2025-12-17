@@ -73,7 +73,7 @@ class ControlPanel:
         ttk.Label(self.frame, text="Texto:").grid(row=2, column=0, padx=5, sticky=tk.W)
         self.text_entry = ttk.Entry(self.frame, width=40)
         self.text_entry.grid(row=2, column=1, padx=5, sticky=tk.W)
-        self.text_entry.insert(0, "Hello RC4")
+        self.text_entry.insert(0, "Hola RC4")
 
         # Speed control
         ttk.Label(self.frame, text="Velocidad:").grid(
@@ -169,8 +169,8 @@ class ButtonPanel:
             ("Ejecutar PRGA Paso a Paso", "step_prga"),
             ("Ejecutar Automático", "auto_run"),
             ("Detener", "stop"),
-            ("Reset", "reset"),
-            ("Run RC4+ Test", "run_test"),
+            ("Reiniciar", "reset"),
+            ("Ejecutar Test RC4+", "run_test"),
         ]
 
         for text, callback_key in buttons:
