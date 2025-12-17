@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk
 import queue
 import math
 import logging
@@ -31,6 +31,9 @@ class TabuAttackGUI(tk.Frame):
         self.update_queue = queue.Queue()
         self.is_running = False
 
+        # NEW: Memory tracking for orange cells
+        self.memory_correct = set()  # Set of indices that were correct at some point
+
         # UI update rate (ms)
         self.update_interval = 100
 
@@ -59,14 +62,31 @@ class TabuAttackGUI(tk.Frame):
         left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         left_frame.grid_propagate(False)
 
-        # Title
+        # Title with Help button
+        title_frame = tk.Frame(left_frame, bg=self.bg_color)
+        title_frame.pack(fill="x", pady=(0, 20))
+
         title = tk.Label(
-            left_frame,
+            title_frame,
             text="Tabu Search Attack",
             font=("Arial", 14, "bold"),
             bg=self.bg_color,
         )
-        title.pack(pady=(0, 20))
+        title.pack(side="left")
+
+        # NEW: Help button
+        help_button = tk.Button(
+            title_frame,
+            text="?",
+            command=self._show_help,
+            bg="#2196F3",
+            fg="white",
+            font=("Arial", 12, "bold"),
+            width=2,
+            height=1,
+            cursor="hand2",
+        )
+        help_button.pack(side="right")
 
         # Configuration section
         config_frame = tk.LabelFrame(
@@ -135,7 +155,20 @@ class TabuAttackGUI(tk.Frame):
             state="disabled",
             cursor="hand2",
         )
-        self.stop_button.pack(fill="x", pady=(0, 20))
+        self.stop_button.pack(fill="x", pady=(0, 10))
+
+        # NEW: Reset button
+        self.reset_button = tk.Button(
+            left_frame,
+            text="Reset",
+            command=self._reset_attack,
+            bg="#FF9800",
+            fg="white",
+            font=("Arial", 12, "bold"),
+            height=2,
+            cursor="hand2",
+        )
+        self.reset_button.pack(fill="x", pady=(0, 20))
 
         # Status section
         status_frame = tk.LabelFrame(
@@ -166,12 +199,23 @@ class TabuAttackGUI(tk.Frame):
         )
         self.tabu_size_label.pack(anchor="w", padx=5, pady=(2, 5))
 
+        # NEW: Success message label
+        self.success_label = tk.Label(
+            left_frame,
+            text="",
+            bg=self.bg_color,
+            font=("Arial", 12, "bold"),
+            fg="green",
+            wraplength=230,
+        )
+        self.success_label.pack(fill="x", pady=(10, 0))
+
     def _create_right_panel(self):
         """Create right visualization panel"""
         right_frame = tk.Frame(self, bg=self.bg_color)
         right_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
-        # Configure grid for three zones
+        # Configure grid for zones
         right_frame.grid_rowconfigure(0, weight=3)  # S-Boxes (larger)
         right_frame.grid_rowconfigure(1, weight=1)  # Tabu List
         right_frame.grid_rowconfigure(2, weight=0)  # Keystream (fixed)
@@ -194,6 +238,7 @@ class TabuAttackGUI(tk.Frame):
         # Configure grid for two canvases side by side
         sbox_frame.grid_rowconfigure(0, weight=0)  # Title row
         sbox_frame.grid_rowconfigure(1, weight=1)  # Canvas row
+        sbox_frame.grid_rowconfigure(2, weight=0)  # NEW: Legend row
         sbox_frame.grid_columnconfigure(0, weight=1)
         sbox_frame.grid_columnconfigure(1, weight=1)
 
@@ -225,6 +270,62 @@ class TabuAttackGUI(tk.Frame):
         )
         self.candidate_canvas.grid(row=1, column=1, sticky="nsew", padx=(5, 0))
 
+        # NEW: Color Legend
+        self._create_color_legend(sbox_frame)
+
+    def _create_color_legend(self, parent):
+        """NEW: Create color legend for S-Box visualization"""
+        legend_frame = tk.Frame(parent, bg=self.bg_color)
+        legend_frame.grid(row=2, column=0, columnspan=2, pady=(5, 0))
+
+        tk.Label(
+            legend_frame,
+            text="Leyenda:",
+            font=("Arial", 9, "bold"),
+            bg=self.bg_color,
+        ).pack(side="left", padx=(0, 10))
+
+        # Green - Correct
+        green_box = tk.Canvas(
+            legend_frame, width=20, height=20, bg="lightgreen", highlightthickness=1
+        )
+        green_box.pack(side="left", padx=2)
+        tk.Label(
+            legend_frame, text="Correcto", font=("Arial", 9), bg=self.bg_color
+        ).pack(side="left", padx=(2, 10))
+
+        # Orange - Was Correct
+        orange_box = tk.Canvas(
+            legend_frame, width=20, height=20, bg="orange", highlightthickness=1
+        )
+        orange_box.pack(side="left", padx=2)
+        tk.Label(
+            legend_frame, text="Fue Correcto", font=("Arial", 9), bg=self.bg_color
+        ).pack(side="left", padx=(2, 10))
+
+        # Red - Incorrect
+        red_box = tk.Canvas(
+            legend_frame, width=20, height=20, bg="lightcoral", highlightthickness=1
+        )
+        red_box.pack(side="left", padx=2)
+        tk.Label(
+            legend_frame, text="Incorrecto", font=("Arial", 9), bg=self.bg_color
+        ).pack(side="left", padx=(2, 10))
+
+        # Yellow border - Current Swap
+        yellow_box = tk.Canvas(
+            legend_frame,
+            width=20,
+            height=20,
+            bg="white",
+            highlightthickness=3,
+            highlightbackground="gold",
+        )
+        yellow_box.pack(side="left", padx=2)
+        tk.Label(
+            legend_frame, text="Intercambio Actual", font=("Arial", 9), bg=self.bg_color
+        ).pack(side="left")
+
     def _create_tabu_zone(self, parent):
         """Create Tabu List visualization zone"""
         tabu_frame = tk.LabelFrame(
@@ -249,7 +350,7 @@ class TabuAttackGUI(tk.Frame):
         self.tabu_listbox.config(yscrollcommand=scrollbar.set)
 
     def _create_keystream_zone(self, parent):
-        """Create Keystream comparison zone"""
+        """NEW: Create Keystream comparison zone with 3 rows"""
         keystream_frame = tk.LabelFrame(
             parent,
             text="Keystream Comparison",
@@ -281,30 +382,52 @@ class TabuAttackGUI(tk.Frame):
         )
         self.target_ks_label.pack(side="left", fill="x", expand=True)
 
-        # Actual keystream
-        actual_ks_frame = tk.Frame(keystream_frame, bg=self.bg_color)
-        actual_ks_frame.pack(fill="x", padx=5, pady=(2, 5))
+        # Current keystream
+        current_ks_frame = tk.Frame(keystream_frame, bg=self.bg_color)
+        current_ks_frame.pack(fill="x", padx=5, pady=2)
 
         tk.Label(
-            actual_ks_frame,
-            text="Actual Output:",
+            current_ks_frame,
+            text="Current Output:",
             font=("Arial", 9, "bold"),
             bg=self.bg_color,
             width=15,
             anchor="w",
         ).pack(side="left")
 
-        self.actual_ks_canvas = tk.Canvas(
-            actual_ks_frame,
+        self.current_ks_canvas = tk.Canvas(
+            current_ks_frame,
             height=25,
             bg="white",
             highlightthickness=1,
             highlightbackground="gray",
         )
-        self.actual_ks_canvas.pack(side="left", fill="x", expand=True)
+        self.current_ks_canvas.pack(side="left", fill="x", expand=True)
 
-    def _draw_sbox(self, canvas, sbox_array, target_sbox=None):
-        """Draw S-Box as a grid on canvas"""
+        # NEW: Best keystream
+        best_ks_frame = tk.Frame(keystream_frame, bg=self.bg_color)
+        best_ks_frame.pack(fill="x", padx=5, pady=(2, 5))
+
+        tk.Label(
+            best_ks_frame,
+            text="Best Output:",
+            font=("Arial", 9, "bold"),
+            bg=self.bg_color,
+            width=15,
+            anchor="w",
+        ).pack(side="left")
+
+        self.best_ks_canvas = tk.Canvas(
+            best_ks_frame,
+            height=25,
+            bg="white",
+            highlightthickness=1,
+            highlightbackground="gray",
+        )
+        self.best_ks_canvas.pack(side="left", fill="x", expand=True)
+
+    def _draw_sbox(self, canvas, sbox_array, target_sbox=None, current_swap=None):
+        """MODIFIED: Draw S-Box with colored borders for swap highlighting"""
         canvas.delete("all")
 
         if sbox_array is None:
@@ -340,19 +463,46 @@ class TabuAttackGUI(tk.Frame):
             x2 = x1 + cell_width
             y2 = y1 + cell_height
 
-            # Determine cell color
+            # Determine cell color and border
+            is_swap_cell = current_swap and idx in current_swap
+
             if target_sbox is not None:
-                # Candidate S-Box: color based on match
-                if sbox_array[idx] == target_sbox[idx]:
+                # Candidate S-Box: color based on match and memory
+                is_currently_correct = sbox_array[idx] == target_sbox[idx]
+                was_correct = idx in self.memory_correct
+
+                # Determine fill color (background)
+                if is_currently_correct:
                     fill_color = "lightgreen"
+                    self.memory_correct.add(idx)  # Add to memory
+                elif was_correct:
+                    fill_color = "orange"  # Was correct before
                 else:
                     fill_color = "lightcoral"
+
+                # Determine border (outline)
+                if is_swap_cell:
+                    outline_color = "gold"  # Yellow/gold border for swap
+                    outline_width = 4
+                else:
+                    outline_color = "gray"
+                    outline_width = 1
             else:
                 # Target S-Box: standard color
                 fill_color = "white"
+                outline_color = "gray"
+                outline_width = 1
 
             # Draw cell
-            canvas.create_rectangle(x1, y1, x2, y2, fill=fill_color, outline="gray")
+            canvas.create_rectangle(
+                x1,
+                y1,
+                x2,
+                y2,
+                fill=fill_color,
+                outline=outline_color,
+                width=outline_width,
+            )
 
             # Draw value (only if cell is large enough)
             if cell_width > 20 and cell_height > 15:
@@ -368,9 +518,8 @@ class TabuAttackGUI(tk.Frame):
                     fill="black",
                 )
 
-    def _draw_keystream_comparison(self, target_ks, actual_ks):
-        """Draw keystream comparison with color coding"""
-        canvas = self.actual_ks_canvas
+    def _draw_keystream_row(self, canvas, target_ks, actual_ks):
+        """NEW: Draw a single keystream comparison row"""
         canvas.delete("all")
 
         if target_ks is None or actual_ks is None:
@@ -379,13 +528,7 @@ class TabuAttackGUI(tk.Frame):
         # Limit display to first 20 bytes
         display_length = min(20, len(target_ks))
 
-        # Update target label
-        target_text = " ".join([f"{b:02X}" for b in target_ks[:display_length]])
-        if len(target_ks) > display_length:
-            target_text += "..."
-        self.target_ks_label.config(text=target_text)
-
-        # Draw actual keystream with color coding
+        # Get canvas dimensions
         canvas.update_idletasks()
         canvas_width = canvas.winfo_width()
         if canvas_width < 10:
@@ -415,6 +558,19 @@ class TabuAttackGUI(tk.Frame):
                 fill="black",
             )
 
+    def _draw_keystream_comparison(self, target_ks, current_ks, best_ks):
+        """NEW: Draw all three keystream rows"""
+        # Update target label
+        display_length = min(20, len(target_ks))
+        target_text = " ".join([f"{b:02X}" for b in target_ks[:display_length]])
+        if len(target_ks) > display_length:
+            target_text += "..."
+        self.target_ks_label.config(text=target_text)
+
+        # Draw current and best keystreams
+        self._draw_keystream_row(self.current_ks_canvas, target_ks, current_ks)
+        self._draw_keystream_row(self.best_ks_canvas, target_ks, best_ks)
+
     def _update_tabu_list(self, tabu_deque):
         """Update tabu list display"""
         self.tabu_listbox.delete(0, tk.END)
@@ -439,13 +595,24 @@ class TabuAttackGUI(tk.Frame):
 
             # Validate parameters
             if keystream_length < 1 or keystream_length > 256:
-                raise ValueError("Keystream length must be between 1 and 256")
+                # NEW: Show error in GUI instead of messagebox
+                self.success_label.config(
+                    text="ERROR: Keystream length must be between 1 and 256", fg="red"
+                )
+                return
             if max_iterations < 1:
-                raise ValueError("Max iterations must be positive")
+                self.success_label.config(
+                    text="ERROR: Max iterations must be positive", fg="red"
+                )
+                return
 
             logger.info(
                 f"Starting attack: N={N}, length={keystream_length}, max_iter={max_iterations}"
             )
+
+            # Clear previous state
+            self.memory_correct.clear()
+            self.success_label.config(text="Searching...", fg="blue")
 
             # Generate challenge
             self.target_state, self.target_keystream = generate_rc4_plus_keystream(
@@ -476,7 +643,8 @@ class TabuAttackGUI(tk.Frame):
 
         except Exception as e:
             logger.error(f"Failed to start attack: {e}", exc_info=True)
-            messagebox.showerror("Error", f"Failed to start attack:\n{str(e)}")
+            # NEW: Show error in GUI
+            self.success_label.config(text=f"ERROR: {str(e)}", fg="red")
             self._stop_attack()
 
     def _stop_attack(self):
@@ -490,6 +658,48 @@ class TabuAttackGUI(tk.Frame):
         self.stop_button.config(state="disabled")
 
         logger.info("Attack stopped")
+
+    def _reset_attack(self):
+        """NEW: Reset the attack to initial state"""
+        logger.info("Resetting attack")
+
+        # Stop if running
+        if self.is_running:
+            self._stop_attack()
+
+        # Clear all state
+        self.cracker = None
+        self.target_state = None
+        self.target_keystream = None
+        self.memory_correct.clear()
+
+        # Clear queue
+        while not self.update_queue.empty():
+            try:
+                self.update_queue.get_nowait()
+            except queue.Empty:
+                break
+
+        # Reset UI elements
+        self.iteration_label.config(text="Iteration: 0")
+        self.fitness_label.config(text="Fitness: 0/0")
+        self.best_fitness_label.config(text="Best Fitness: 0/0")
+        self.tabu_size_label.config(text="Tabu Size: 0")
+        self.success_label.config(text="")
+
+        # Clear visualizations
+        self.target_canvas.delete("all")
+        self.candidate_canvas.delete("all")
+        self.current_ks_canvas.delete("all")
+        self.best_ks_canvas.delete("all")
+        self.target_ks_label.config(text="")
+        self.tabu_listbox.delete(0, tk.END)
+
+        # Enable start button
+        self.start_button.config(state="normal")
+        self.stop_button.config(state="disabled")
+
+        logger.info("Attack reset completed")
 
     def _schedule_ui_update(self):
         """Schedule periodic UI updates"""
@@ -525,11 +735,14 @@ class TabuAttackGUI(tk.Frame):
                 self.candidate_canvas,
                 stats["current_candidate"],
                 target_sbox=stats["target_state"],
+                current_swap=stats.get("current_swap"),
             )
 
-            # Update keystream comparison
+            # Update keystream comparison (3 rows)
             self._draw_keystream_comparison(
-                stats["target_keystream"], stats["predicted_keystream"]
+                stats["target_keystream"],
+                stats["predicted_keystream"],
+                stats.get("best_predicted_keystream", stats["predicted_keystream"]),
             )
 
             # Update tabu list
@@ -539,12 +752,106 @@ class TabuAttackGUI(tk.Frame):
             # Check for completion
             if stats["best_fitness"] == keystream_length:
                 self._stop_attack()
-                messagebox.showinfo(
-                    "Success!", f"State recovered in {stats['iteration']} iterations!"
+                # NEW: Show success in GUI instead of messagebox
+                self.success_label.config(
+                    text=f"¡ÉXITO! SOLUCIÓN ENCONTRADA\nEn {stats['iteration']} iteraciones",
+                    fg="green",
+                    font=("Arial", 14, "bold"),
                 )
 
         except Exception as e:
             logger.error(f"Error updating UI: {e}", exc_info=True)
+
+    def _show_help(self):
+        """NEW: Show help window with mountain metaphor"""
+        help_window = tk.Toplevel(self.parent)
+        help_window.title("Ayuda - Búsqueda Tabú")
+        help_window.geometry("600x500")
+        help_window.configure(bg=self.bg_color)
+
+        # Make it modal
+        help_window.transient(self.parent)
+        help_window.grab_set()
+
+        # Title
+        title = tk.Label(
+            help_window,
+            text="¿Cómo funciona la Búsqueda Tabú?",
+            font=("Arial", 16, "bold"),
+            bg=self.bg_color,
+        )
+        title.pack(pady=(20, 10))
+
+        # Main text frame
+        text_frame = tk.Frame(help_window, bg="white", relief="sunken", borderwidth=2)
+        text_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        # Content
+        help_text = """
+🏔️ LA METÁFORA DE LA MONTAÑA
+
+Imagina que estás escalando una montaña en la niebla, buscando la CIMA MÁS ALTA (fitness perfecto: 10/10).
+
+🎯 OBJETIVO:
+   Encontrar el estado interno correcto del cifrado RC4+.
+
+❌ PROBLEMA:
+   Los algoritmos tradicionales se quedan atascados en "CIMAS FALSAS"
+   (óptimos locales) - piensan que llegaron arriba, pero no es la cima real.
+
+✅ SOLUCIÓN TABÚ:
+   
+   1. ACEPTA BAJAR TEMPORALMENTE
+      → Si estás en una cima falsa (fitness 7/10), el algoritmo puede
+         aceptar movimientos que EMPEORAN (bajar a 6/10) para escapar
+         del atasco.
+
+   2. MEMORIA (LISTA TABÚ)
+      → Recuerda los últimos movimientos realizados para no volver
+         atrás inmediatamente (evita dar vueltas en círculo).
+
+   3. EXPLORACIÓN INTELIGENTE
+      → Puede bajar de la cima falsa, explorar el valle, y encontrar
+         el camino hacia la CIMA REAL.
+
+🎨 COLORES EN LA VISUALIZACIÓN:
+
+   🟢 Verde: Celda correcta AHORA
+   🟠 Naranja: Fue correcta antes (memoria visual)
+   🔴 Rojo: Nunca ha sido correcta
+   🟡 Borde Dorado: Intercambio actual en progreso
+
+💡 RESUMEN:
+   La clave está en ACEPTAR EMPEORAR temporalmente para encontrar
+   mejores soluciones a largo plazo. ¡Como bajar un poco para poder
+   escalar más alto!
+        """
+
+        help_label = tk.Label(
+            text_frame,
+            text=help_text,
+            font=("Courier", 10),
+            bg="white",
+            justify="left",
+            anchor="nw",
+            padx=15,
+            pady=15,
+        )
+        help_label.pack(fill="both", expand=True)
+
+        # Close button
+        close_button = tk.Button(
+            help_window,
+            text="Cerrar",
+            command=help_window.destroy,
+            bg="#2196F3",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            cursor="hand2",
+            padx=20,
+            pady=5,
+        )
+        close_button.pack(pady=(0, 20))
 
 
 def main():

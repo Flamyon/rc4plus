@@ -36,7 +36,7 @@ def rc4_plus_prga(S, length, N):
     logger.debug(f"S min={S.min()}, S max={S.max()}")
 
     S_work = S.copy()
-    i, j = 0, 0
+    i, j = 0, 0  # Keep as Python ints
     keystream = np.zeros(length, dtype=np.uint8)
 
     # Calculate bit width for N to ensure operations stay within bounds
@@ -45,15 +45,15 @@ def rc4_plus_prga(S, length, N):
 
     for step in range(length):
         try:
-            # RC4+ PRGA step with modulo N for index safety
+            # RC4+ PRGA step - use Python int to avoid overflow
             i = (i + 1) % N
-            j = (j + S_work[i]) % N
+            j = (j + int(S_work[i])) % N  # Convert to Python int before addition
 
             # Swap
             S_work[i], S_work[j] = S_work[j], S_work[i]
 
             # Calculate output indices using modulo N
-            t = (S_work[i] + S_work[j]) % N
+            t = (int(S_work[i]) + int(S_work[j])) % N  # Use int() for safety
 
             # RC4+ specific calculations with bit operations scaled to N
             # Shift amounts must be proportional to n_bits, not hardcoded
@@ -242,6 +242,12 @@ class TabuCracker:
             self.current_candidate
         )
 
+        # NEW: Track best predicted keystream for visualization
+        self.best_predicted_keystream = self.current_predicted_keystream.copy()
+
+        # NEW: Track current swap for visualization
+        self.current_swap = None
+
         # Threading
         self.running = False
         self.thread = None
@@ -360,6 +366,7 @@ class TabuCracker:
             if best_neighbor is not None:
                 self.current_candidate = best_neighbor
                 self.current_fitness = best_neighbor_fitness
+                self.current_swap = best_move  # NEW: Store current swap
 
                 # Update predicted keystream for visualization
                 self.current_predicted_keystream = self._generate_keystream(
@@ -373,6 +380,10 @@ class TabuCracker:
                     )
                     self.best_candidate = best_neighbor.copy()
                     self.best_fitness = best_neighbor_fitness
+                    # NEW: Update best predicted keystream
+                    self.best_predicted_keystream = (
+                        self.current_predicted_keystream.copy()
+                    )
 
                 self._add_to_tabu(best_move)
 
@@ -396,7 +407,9 @@ class TabuCracker:
                     self.target_state.copy() if self.target_state is not None else None
                 ),
                 "predicted_keystream": self.current_predicted_keystream.copy(),
+                "best_predicted_keystream": self.best_predicted_keystream.copy(),  # NEW
                 "target_keystream": self.target_keystream.copy(),
+                "current_swap": self.current_swap,  # NEW
             }
 
     def run(self, max_iterations=1000, callback=None):
