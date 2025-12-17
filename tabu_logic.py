@@ -417,9 +417,14 @@ class TabuCracker:
                 "current_swap": self.current_swap,
             }
 
-    def run(self, max_iterations=1000, callback=None):
+    def run(self, max_iterations=1000, callback=None, delay=0.001):
         """
         Run Tabu Search for multiple iterations in background thread
+
+        Args:
+            max_iterations: Maximum number of iterations
+            callback: Optional callback function for progress updates
+            delay: Delay between iterations in seconds (0 for maximum speed)
         """
 
         def _run_loop():
@@ -436,7 +441,9 @@ class TabuCracker:
                 if self.best_fitness == self.keystream_length:
                     break
 
-                time.sleep(0.001)
+                # Only sleep if delay > 0
+                if delay > 0:
+                    time.sleep(delay)
 
             self.running = False
 

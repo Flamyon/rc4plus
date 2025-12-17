@@ -643,6 +643,7 @@ class TabuAttackGUI(tk.Frame):
 
             # Clear previous state
             self.memory_correct.clear()
+            self.memory_correct_keystream.clear()
             self.success_label.config(text="Searching...", fg="blue")
 
             # Generate challenge
@@ -668,7 +669,8 @@ class TabuAttackGUI(tk.Frame):
             def callback(stats):
                 self.update_queue.put(stats)
 
-            self.cracker.run(max_iterations=max_iterations, callback=callback)
+            # MODIFIED: Use delay=0.05 for smooth visualization
+            self.cracker.run(max_iterations=max_iterations, callback=callback, delay=0.05)
 
             logger.info("Attack started successfully")
 
