@@ -1,20 +1,40 @@
-# RC4/RC4+ Stream Cipher Visualizer
+# RC4+ Stream Cipher: Herramienta de Visualización Educativa y Análisis de Vulnerabilidades
 
-Visualizador interactivo del algoritmo de cifrado RC4 y su variante RC4+, mostrando paso a paso el funcionamiento interno del algoritmo.
+## Resumen
+
+Este proyecto implementa una herramienta educativa interactiva para el análisis y visualización del algoritmo de cifrado de flujo RC4 y su variante mejorada RC4+ (Polak & Boryczka, 2019). La aplicación permite estudiar tanto el funcionamiento interno de estos algoritmos como sus vulnerabilidades de seguridad mediante la implementación de un ataque de recuperación de estado basado en Búsqueda Tabú.
+
+## Motivación Académica
+
+El cifrado RC4, aunque ampliamente utilizado históricamente en protocolos como WEP, WPA y SSL/TLS, presenta vulnerabilidades conocidas que lo hacen inadecuado para aplicaciones de seguridad modernas. RC4+ fue propuesto como una mejora para mitigar algunas de estas debilidades mediante la introducción de mayor complejidad en el generador pseudoaleatorio (PRGA).
+
+Este trabajo tiene como objetivo:
+1. **Visualizar** el funcionamiento interno de RC4 y RC4+ para fines educativos
+2. **Implementar** el ataque de recuperación de estado mediante Búsqueda Tabú descrito por Polak & Boryczka (2019)
+3. **Analizar** experimentalmente la resistencia de RC4+ frente a ataques criptoanalíticos
+4. **Demostrar** las diferencias arquitecturales entre RC4 clásico y RC4+
 
 ## Arquitectura del Código
 
-El proyecto está organizado en módulos separados para facilitar el mantenimiento y la comprensión:
+El proyecto está organizado en una arquitectura modular que separa responsabilidades y facilita la extensibilidad:
 
 ### 📁 Estructura de Archivos
 
 ```
 rc4plus/
-├── rc4_visual.py          # Aplicación principal y lógica de control
-├── rc4_crypto.py          # Implementaciones de algoritmos RC4 y RC4+
-├── rc4_visualization.py   # Visualización del estado y logging
-├── rc4_ui.py             # Componentes de interfaz de usuario
-└── README.md             # Este archivo
+├── main.py                    # Aplicación principal y lógica de control
+├── rc4/
+│   ├── rc4_crypto.py         # Implementaciones de algoritmos RC4 y RC4+
+│   ├── rc4_visualization.py  # Visualización del estado y logging
+│   ├── rc4_ui.py            # Componentes de interfaz de usuario
+│   └── test_rc4.py          # Tests unitarios de los algoritmos
+├── tabu_search/
+│   ├── tabu_logic.py        # Motor de Búsqueda Tabú (configuración Z2)
+│   └── tabu_gui.py          # Interfaz gráfica del ataque
+├── utils/
+│   └── utils.py             # Utilidades auxiliares
+├── requirements.txt         # Dependencias del proyecto
+└── README.md               # Este archivo
 ```
 
 ### 🔧 Módulos
@@ -81,7 +101,7 @@ rc4plus/
 
 ### Ejecutar la aplicación
 ```bash
-python3 rc4_visual.py
+python3 main.py
 ```
 
 ### Flujo básico de uso
@@ -169,14 +189,34 @@ python3 -c "import tkinter; print('tkinter OK')"
 sudo apt-get install python3-tk  # Ubuntu/Debian
 ```
 
+## 📊 Ventajas de la Arquitectura Modular
+
+1. **Separación de responsabilidades**: Cada módulo tiene un propósito claramente definido
+2. **Facilidad de prueba**: Los módulos pueden probarse independientemente
+3. **Reutilización**: Los componentes pueden emplearse en otros proyectos
+4. **Mantenibilidad**: Cambios localizados en módulos específicos sin afectar al resto
+5. **Extensibilidad**: Fácil añadir nuevos algoritmos o métodos de visualización
+6. **Legibilidad**: Código organizado, documentado y autoexplicativo
+
 ## 📚 Referencias
 
-- **RC4+**: Polak, A., & Boryczka, M. (2019). "Tabu Search in revealing the internal state of RC4+ cipher"
+1. **Rivest, R. L.** (1987). *The RC4 Encryption Algorithm*. RSA Data Security, Inc.
 
-## 👤 Autor
+2. **Polak, A., & Boryczka, M.** (2019). *Tabu Search in Revealing the Internal State of RC4+ Cipher*. In: Rutkowski, L., Scherer, R., Korytkowski, M., Pedrycz, W., Tadeusiewicz, R., Zurada, J. (eds) Artificial Intelligence and Soft Computing. ICAISC 2019. Lecture Notes in Computer Science(), vol 11509. Springer, Cham. https://doi.org/10.1007/978-3-030-20915-5_21
 
-Francisco Rodríguez-Carretero Roldán
+3. **Fluhrer, S., Mantin, I., & Shamir, A.** (2001). *Weaknesses in the Key Scheduling Algorithm of RC4*. In Selected Areas in Cryptography (pp. 1-24). Springer.
+
+4. **AlFardan, N., Bernstein, D. J., Paterson, K. G., Poettering, B., & Schuldt, J. C.** (2013). *On the Security of RC4 in TLS*. In USENIX Security Symposium (pp. 305-320).
+
+## 👤 Autores
+
+**Francisco Rodríguez-Carretero Roldán**  
+**Miguel Regidor García**
 
 ## 📄 Licencia
 
-[Especificar licencia si aplica]
+Este proyecto ha sido desarrollado con fines educativos y de investigación. 
+
+---
+
+**Advertencia**: Este software se proporciona "tal cual" sin garantías de ningún tipo. Los algoritmos RC4 y RC4+ implementados aquí son únicamente para estudio académico y NO deben emplearse en sistemas de producción o aplicaciones que requieran seguridad criptográfica real.
